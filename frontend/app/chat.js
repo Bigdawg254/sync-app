@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'r
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const SERVER = 'http://192.168.0.102:5000';
+const SERVER = 'https://sync-app-production-2ff8.up.railway.app';
 const MY_ID = 1;
 const OTHER_ID = 1;
 const ROOM = [MY_ID, OTHER_ID].sort().join('_');

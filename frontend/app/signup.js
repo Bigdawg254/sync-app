@@ -17,7 +17,7 @@ export default function SignupScreen() {
     }
     setLoading(true);
     try {
-      const response = await fetch('http://192.168.0.102:5000/api/auth/signup', {
+      const response = await fetch('https://sync-app-production-2ff8.up.railway.app/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password, age: parseInt(age) })

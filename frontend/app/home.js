@@ -8,7 +8,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://192.168.0.102:5000/api/users')
+    fetch('https://sync-app-production-2ff8.up.railway.app/api/users')
       .then(res => res.json())
       .then(data => {
         setUsers(data);
