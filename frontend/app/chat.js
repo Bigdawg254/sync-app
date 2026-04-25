@@ -1,16 +1,40 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
+
+const SERVER = 'http://192.168.0.102:5000';
+const MY_ID = 1;
+const OTHER_ID = 1;
+const ROOM = [MY_ID, OTHER_ID].sort().join('_');
 
 export default function ChatScreen() {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([
-    { id: '1', text: 'Hey! I saw your profile', sender: 'them' },
-    { id: '2', text: 'Hi! Thanks for connecting', sender: 'me' },
-  ]);
+  const [messages, setMessages] = useState([]);
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    socketRef.current = io(SERVER);
+    socketRef.current.emit('join_room', ROOM);
+
+    socketRef.current.on('receive_message', (data) => {
+      setMessages(prev => [...prev, data]);
+    });
+
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, []);
 
   const sendMessage = () => {
     if (message.trim()) {
-      setMessages([...messages, { id: Date.now().toString(), text: message, sender: 'me' }]);
+      const msgData = {
+        room: ROOM,
+        sender_id: MY_ID,
+        text: message,
+        sender: 'me'
+      };
+      socketRef.current.emit('send_message', msgData);
+      setMessages(prev => [...prev, { ...msgData, sender: 'me' }]);
       setMessage('');
     }
   };
@@ -20,7 +44,7 @@ export default function ChatScreen() {
       <Text style={styles.header}>Chat</Text>
       <FlatList
         data={messages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => index.toString()}
         renderItem={({ item }) => (
           <View style={[styles.bubble, item.sender === 'me' ? styles.me : styles.them]}>
             <Text style={styles.msgText}>{item.text}</Text>
