@@ -50,7 +50,7 @@ export default function EditProfileScreen() {
       const data = await response.json();
       if (response.ok) {
         Alert.alert('Success', 'Profile updated!');
-        router.back();
+        router.push('/profile');
       } else {
         Alert.alert('Error', data.error);
       }
@@ -63,7 +63,7 @@ export default function EditProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.push('/profile')}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
