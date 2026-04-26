@@ -64,7 +64,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Sync</Text>
         <View style={styles.headerRight}>
@@ -82,7 +81,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         {['chats', 'status', 'calls'].map(tab => (
           <TouchableOpacity
@@ -96,7 +94,6 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* Content */}
       {activeTab === 'chats' && (
         loading ? (
           <View style={styles.emptyContainer}>
@@ -104,7 +101,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.flex}>
-            {/* Random Match Banner */}
             <TouchableOpacity style={styles.randomBanner} onPress={() => router.push('/random-match')}>
               <Text style={styles.randomBannerIcon}>🎲</Text>
               <View>
