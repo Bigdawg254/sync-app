@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -58,43 +58,57 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={pickImage}>
-        {image ? (
-          <Image source={{ uri: image }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>
-              {user?.username ? user.username[0].toUpperCase() : '?'}
-            </Text>
-          </View>
-        )}
-        <Text style={styles.changePhoto}>Tap to change photo</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.username}>{user?.username || 'Loading...'}</Text>
-      <Text style={styles.bio}>{user?.bio || 'No bio yet'}</Text>
-
-      <View style={styles.infoBox}>
-        <Text style={styles.infoText}>📧 {user?.email}</Text>
-        <Text style={styles.infoText}>🎂 Age: {user?.age}</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>My Profile</Text>
       </View>
 
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Edit Profile</Text>
-      </TouchableOpacity>
+      <View style={styles.content}>
+        <TouchableOpacity onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {user?.username ? user.username[0].toUpperCase() : '?'}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.changePhoto}>Tap to change photo</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.username}>{user?.username || 'Loading...'}</Text>
+        <Text style={styles.bio}>{user?.bio || 'No bio yet'}</Text>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>📧 {user?.email}</Text>
+          <Text style={styles.infoText}>🎂 Age: {user?.age}</Text>
+          <Text style={styles.infoText}>⚧ {user?.gender || 'Not set'}</Text>
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/edit-profile')}>
+          <Text style={styles.buttonText}>Edit Profile</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f', alignItems: 'center', padding: 24 },
-  avatar: { width: 90, height: 90, borderRadius: 45, marginTop: 60 },
-  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+  container: { flex: 1, backgroundColor: '#0f0f0f' },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 50, backgroundColor: '#1a1a2e', gap: 16 },
+  back: { color: '#6c63ff', fontSize: 16 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  content: { alignItems: 'center', padding: 24 },
+  avatar: { width: 90, height: 90, borderRadius: 45 },
+  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 36, color: '#fff', fontWeight: 'bold' },
   changePhoto: { color: '#6c63ff', textAlign: 'center', marginTop: 8, marginBottom: 16 },
   username: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 8 },
@@ -103,6 +117,6 @@ const styles = StyleSheet.create({
   infoText: { color: '#aaa', marginBottom: 10, fontSize: 15 },
   button: { backgroundColor: '#6c63ff', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 24 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  logoutBtn: { marginTop: 16 },
+  logoutBtn: { marginTop: 16, marginBottom: 40 },
   logoutText: { color: '#ff4d4d', fontSize: 15 }
 });
