@@ -45,13 +45,13 @@ export default function HomeScreen() {
 
   const renderStatus = () => (
     <View style={styles.statusContainer}>
-      <TouchableOpacity style={styles.myStatus}>
+      <TouchableOpacity style={styles.myStatus} onPress={() => router.push('/status')}>
         <View style={styles.addStatus}>
           <Text style={styles.addStatusText}>+</Text>
         </View>
         <Text style={styles.statusLabel}>My Status</Text>
       </TouchableOpacity>
-      <Text style={styles.statusHint}>Add a status update</Text>
+      <Text style={styles.statusHint}>Tap to view and add status updates</Text>
     </View>
   );
 
@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
   emptySubText: { color: '#888', marginTop: 8 },
   findFriendsBtn: { backgroundColor: '#6c63ff', padding: 14, borderRadius: 10, marginTop: 20 },
   findFriendsBtnText: { color: '#fff', fontWeight: 'bold' },
-  statusContainer: { padding: 16, alignItems: 'center' },
+  statusContainer: { flex: 1, padding: 16, alignItems: 'center', justifyContent: 'center' },
   myStatus: { alignItems: 'center', marginBottom: 16 },
-  addStatus: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  addStatusText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  statusLabel: { color: '#888', marginTop: 6, fontSize: 12 },
+  addStatus: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
+  addStatusText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
+  statusLabel: { color: '#fff', marginTop: 8, fontSize: 14, fontWeight: 'bold' },
   statusHint: { color: '#555', fontSize: 14 },
 });
