@@ -8,10 +8,13 @@ const API = 'https://sync-app-production-2ff8.up.railway.app';
 export default function RequestsScreen() {
   const router = useRouter();
   const [requests, setRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('requests');
 
   useEffect(() => {
     fetchRequests();
+    fetchNotifications();
   }, []);
 
   const fetchRequests = async () => {
@@ -27,6 +30,26 @@ export default function RequestsScreen() {
       console.log(err);
     }
     setLoading(false);
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const userId = await SecureStore.getItemAsync('userId');
+      const token = await SecureStore.getItemAsync('userToken');
+      const response = await fetch(`${API}/api/connections/notifications/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setNotifications(data);
+
+      // Mark as read
+      await fetch(`${API}/api/connections/notifications/${userId}/read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const acceptRequest = async (connectionId) => {
@@ -61,34 +84,75 @@ export default function RequestsScreen() {
         <TouchableOpacity onPress={() => router.replace('/home')}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Friend Requests</Text>
+        <Text style={styles.headerTitle}>Notifications</Text>
       </View>
 
-      {requests.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No pending requests</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={requests}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.requestCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.username[0].toUpperCase()}</Text>
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+          onPress={() => setActiveTab('requests')}>
+          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
+            Friend Requests {requests.length > 0 ? `(${requests.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'notifications' && styles.activeTab]}
+          onPress={() => setActiveTab('notifications')}>
+          <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
+            Notifications {notifications.length > 0 ? `(${notifications.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'requests' && (
+        requests.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>No pending requests</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={requests}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.requestCard}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{item.username[0].toUpperCase()}</Text>
+                </View>
+                <View style={styles.userInfo}>
+                  <Text style={styles.username}>{item.username}</Text>
+                  <Text style={styles.bio}>{item.bio || 'No bio yet'}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.acceptBtn}
+                  onPress={() => acceptRequest(item.id)}>
+                  <Text style={styles.acceptBtnText}>Accept</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.userInfo}>
-                <Text style={styles.username}>{item.username}</Text>
-                <Text style={styles.bio}>{item.bio || 'No bio yet'}</Text>
+            )}
+          />
+        )
+      )}
+
+      {activeTab === 'notifications' && (
+        notifications.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>No notifications</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={[styles.notificationCard, !item.is_read && styles.unread]}>
+                <Text style={styles.notificationText}>🔔 {item.message}</Text>
+                <Text style={styles.notificationTime}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Text>
               </View>
-              <TouchableOpacity
-                style={styles.acceptBtn}
-                onPress={() => acceptRequest(item.id)}>
-                <Text style={styles.acceptBtnText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+            )}
+          />
+        )
       )}
     </View>
   );
@@ -100,6 +164,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 50, backgroundColor: '#1a1a2e', gap: 16 },
   back: { color: '#6c63ff', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  tabs: { flexDirection: 'row', backgroundColor: '#1a1a2e', borderBottomWidth: 1, borderBottomColor: '#2d2d44' },
+  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  activeTab: { borderBottomWidth: 2, borderBottomColor: '#6c63ff' },
+  tabText: { color: '#888', fontWeight: 'bold', fontSize: 13 },
+  activeTabText: { color: '#6c63ff' },
   requestCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
   avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
@@ -109,4 +178,8 @@ const styles = StyleSheet.create({
   acceptBtn: { backgroundColor: '#00c853', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   acceptBtnText: { color: '#fff', fontWeight: 'bold' },
   emptyText: { color: '#888', fontSize: 16 },
+  notificationCard: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
+  unread: { backgroundColor: '#1a1a2e' },
+  notificationText: { color: '#fff', fontSize: 14 },
+  notificationTime: { color: '#888', fontSize: 12, marginTop: 4 },
 });

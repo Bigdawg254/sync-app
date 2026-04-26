@@ -10,6 +10,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [image, setImage] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -41,11 +43,82 @@ export default function ProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
+      base64: true
     });
     if (!result.canceled) {
       setImage(result.assets[0].uri);
-      Alert.alert('Success', 'Profile picture updated!');
+      setImageBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
     }
+  };
+
+  const saveProfilePicture = async () => {
+    if (!imageBase64) {
+      Alert.alert('No image', 'Please select an image first');
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await SecureStore.getItemAsync('userId');
+      const response = await fetch(`${API}/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          username: user.username,
+          bio: user.bio,
+          age: user.age,
+          gender: user.gender,
+          profile_picture: imageBase64
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', 'Profile picture saved!');
+        setImage(data.profile_picture);
+        setImageBase64(null);
+      } else {
+        Alert.alert('Error', data.error);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Cannot connect to server');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure? This cannot be undone!',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await SecureStore.getItemAsync('userToken');
+              const userId = await SecureStore.getItemAsync('userId');
+              const response = await fetch(`${API}/api/auth/delete/${userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (response.ok) {
+                await SecureStore.deleteItemAsync('userToken');
+                await SecureStore.deleteItemAsync('userId');
+                await SecureStore.deleteItemAsync('userEmail');
+                await SecureStore.deleteItemAsync('userPassword');
+                router.replace('/login');
+              }
+            } catch (err) {
+              Alert.alert('Error', 'Cannot delete account');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleLogout = async () => {
@@ -79,6 +152,12 @@ export default function ProfileScreen() {
           <Text style={styles.changePhoto}>Tap to change photo</Text>
         </TouchableOpacity>
 
+        {imageBase64 && (
+          <TouchableOpacity style={styles.savePhotoBtn} onPress={saveProfilePicture}>
+            <Text style={styles.savePhotoBtnText}>{saving ? 'Saving...' : 'Save Photo'}</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.username}>{user?.username || 'Loading...'}</Text>
         <Text style={styles.bio}>{user?.bio || 'No bio yet'}</Text>
 
@@ -95,6 +174,10 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteText}>Delete Account</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -109,13 +192,17 @@ const styles = StyleSheet.create({
   avatar: { width: 90, height: 90, borderRadius: 45 },
   avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 36, color: '#fff', fontWeight: 'bold' },
-  changePhoto: { color: '#6c63ff', textAlign: 'center', marginTop: 8, marginBottom: 16 },
+  changePhoto: { color: '#6c63ff', textAlign: 'center', marginTop: 8, marginBottom: 8 },
+  savePhotoBtn: { backgroundColor: '#00c853', padding: 10, borderRadius: 10, marginBottom: 16 },
+  savePhotoBtnText: { color: '#fff', fontWeight: 'bold' },
   username: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 8 },
   bio: { color: '#888', marginTop: 8, textAlign: 'center' },
   infoBox: { backgroundColor: '#1e1e1e', borderRadius: 12, padding: 16, width: '100%', marginTop: 24 },
   infoText: { color: '#aaa', marginBottom: 10, fontSize: 15 },
   button: { backgroundColor: '#6c63ff', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 24 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  logoutBtn: { marginTop: 16, marginBottom: 40 },
-  logoutText: { color: '#ff4d4d', fontSize: 15 }
+  logoutBtn: { marginTop: 16 },
+  logoutText: { color: '#ff4d4d', fontSize: 15 },
+  deleteBtn: { marginTop: 16, marginBottom: 40 },
+  deleteText: { color: '#ff0000', fontSize: 15, fontWeight: 'bold' }
 });
