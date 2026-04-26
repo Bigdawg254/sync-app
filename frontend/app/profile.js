@@ -1,34 +1,90 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+
+const API = 'https://sync-app-production-2ff8.up.railway.app';
 
 export default function ProfileScreen() {
-  const user = {
-    username: 'Bigdawg254',
-    email: 'brian@example.com',
-    age: 20,
-    bio: 'Just vibing and connecting',
-    gender: 'Male'
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [image, setImage] = useState(null);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await SecureStore.getItemAsync('userId');
+      const response = await fetch(`${API}/api/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setUser(data);
+      if (data.profile_picture) setImage(data.profile_picture);
+    } catch (err) {
+      console.log('Profile load error:', err);
+    }
+  };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access to your photos');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true
+    });
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+      Alert.alert('Success', 'Profile picture updated!');
+    }
+  };
+
+  const handleLogout = async () => {
+    await SecureStore.deleteItemAsync('userToken');
+    await SecureStore.deleteItemAsync('userId');
+    await SecureStore.deleteItemAsync('userEmail');
+    await SecureStore.deleteItemAsync('userPassword');
+    router.push('/login');
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{user.username[0]}</Text>
-      </View>
+      <TouchableOpacity onPress={pickImage}>
+        {image ? (
+          <Image source={{ uri: image }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarText}>
+              {user?.username ? user.username[0].toUpperCase() : '?'}
+            </Text>
+          </View>
+        )}
+        <Text style={styles.changePhoto}>Tap to change photo</Text>
+      </TouchableOpacity>
 
-      <Text style={styles.username}>{user.username}</Text>
-      <Text style={styles.bio}>{user.bio}</Text>
+      <Text style={styles.username}>{user?.username || 'Loading...'}</Text>
+      <Text style={styles.bio}>{user?.bio || 'No bio yet'}</Text>
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>📧 {user.email}</Text>
-        <Text style={styles.infoText}>🎂 Age: {user.age}</Text>
-        <Text style={styles.infoText}>⚧ {user.gender}</Text>
+        <Text style={styles.infoText}>📧 {user?.email}</Text>
+        <Text style={styles.infoText}>🎂 Age: {user?.age}</Text>
       </View>
 
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Edit Profile</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.logoutBtn}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </View>
@@ -37,9 +93,11 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f', alignItems: 'center', padding: 24 },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+  avatar: { width: 90, height: 90, borderRadius: 45, marginTop: 60 },
+  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginTop: 60 },
   avatarText: { fontSize: 36, color: '#fff', fontWeight: 'bold' },
-  username: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 16 },
+  changePhoto: { color: '#6c63ff', textAlign: 'center', marginTop: 8, marginBottom: 16 },
+  username: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 8 },
   bio: { color: '#888', marginTop: 8, textAlign: 'center' },
   infoBox: { backgroundColor: '#1e1e1e', borderRadius: 12, padding: 16, width: '100%', marginTop: 24 },
   infoText: { color: '#aaa', marginBottom: 10, fontSize: 15 },

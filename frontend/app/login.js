@@ -2,6 +2,18 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
+
+const API = 'https://sync-app-production-2ff8.up.railway.app';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -12,12 +24,36 @@ export default function LoginScreen() {
 
   useEffect(() => {
     checkBiometrics();
+    loadSavedCredentials();
+    registerForNotifications();
   }, []);
 
   const checkBiometrics = async () => {
     const compatible = await LocalAuthentication.hasHardwareAsync();
     const enrolled = await LocalAuthentication.isEnrolledAsync();
     setBiometricAvailable(compatible && enrolled);
+  };
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedEmail = await SecureStore.getItemAsync('userEmail');
+      const savedPassword = await SecureStore.getItemAsync('userPassword');
+      if (savedEmail) setEmail(savedEmail);
+      if (savedPassword) setPassword(savedPassword);
+    } catch (err) {
+      console.log('No saved credentials');
+    }
+  };
+
+  const registerForNotifications = async () => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+      const token = await Notifications.getExpoPushTokenAsync();
+      console.log('Push token:', token.data);
+    } catch (err) {
+      console.log('Notification error:', err);
+    }
   };
 
   const handleBiometricLogin = async () => {
@@ -39,13 +75,17 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const response = await fetch('https://sync-app-production-2ff8.up.railway.app/api/auth/login', {
+      const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       const data = await response.json();
       if (response.ok) {
+        await SecureStore.setItemAsync('userEmail', email);
+        await SecureStore.setItemAsync('userPassword', password);
+        await SecureStore.setItemAsync('userToken', data.token);
+        await SecureStore.setItemAsync('userId', data.user.id.toString());
         router.push('/home');
       } else {
         Alert.alert('Error', data.error);
@@ -77,6 +117,10 @@ export default function LoginScreen() {
       <TouchableOpacity onPress={() => router.push('/signup')}>
         <Text style={styles.link}>Don't have an account? Sign Up</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => router.push('/reset-password')}>
+        <Text style={styles.forgot}>Forgot Password?</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -90,5 +134,6 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   biometricBtn: { backgroundColor: '#1e1e1e', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#6c63ff' },
   biometricText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 16 },
-  link: { color: '#6c63ff', textAlign: 'center', marginTop: 10 }
+  link: { color: '#6c63ff', textAlign: 'center', marginTop: 10 },
+  forgot: { color: '#888', textAlign: 'center', marginTop: 16 }
 });
