@@ -14,6 +14,7 @@ export default function Layout() {
       <Stack.Screen name="requests" />
       <Stack.Screen name="random-match" />
       <Stack.Screen name="reset-password" />
+      <Stack.Screen name="status" />
     </Stack>
   );
 }
