@@ -53,13 +53,13 @@ export default function ProfileScreen() {
     await SecureStore.deleteItemAsync('userId');
     await SecureStore.deleteItemAsync('userEmail');
     await SecureStore.deleteItemAsync('userPassword');
-    router.push('/login');
+    router.replace('/login');
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/home')}>
+        <TouchableOpacity onPress={() => router.replace('/home')}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>

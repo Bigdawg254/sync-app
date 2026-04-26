@@ -9,7 +9,6 @@ const API = 'https://sync-app-production-2ff8.up.railway.app';
 export default function StatusScreen() {
   const router = useRouter();
   const [statuses, setStatuses] = useState([]);
-  const [myStatus, setMyStatus] = useState(null);
 
   useEffect(() => {
     loadStatuses();
@@ -70,7 +69,7 @@ export default function StatusScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/home')}>
+        <TouchableOpacity onPress={() => router.replace('/home')}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Status</Text>
