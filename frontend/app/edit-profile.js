@@ -39,13 +39,21 @@ export default function EditProfileScreen() {
     try {
       const userId = await SecureStore.getItemAsync('userId');
       const token = await SecureStore.getItemAsync('userToken');
+
+      const ageValue = age && age.trim() !== '' ? parseInt(age) : null;
+
       const response = await fetch(`${API}/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ username, bio, age: parseInt(age), gender })
+        body: JSON.stringify({ 
+          username: username || '', 
+          bio: bio || '', 
+          age: ageValue, 
+          gender: gender || '' 
+        })
       });
       const data = await response.json();
       if (response.ok) {
