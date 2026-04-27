@@ -57,8 +57,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ec3ad376-08eb-4214-be33-6bb3379ffc08"
+        "projectId": "33055257-ea32-48a3-bdb7-e3882a9bc51b"
       }
-    }
+    },
+    "owner": "breezer254"
   }
 }

@@ -31,7 +31,9 @@ export default function HomeScreen() {
   };
 
   const renderChat = ({ item }) => (
-    <TouchableOpacity style={styles.chatItem} onPress={() => router.push('/chat')}>
+    <TouchableOpacity 
+      style={styles.chatItem} 
+      onPress={() => router.push({ pathname: '/chat', params: { friendId: item.id, friendName: item.username } })}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{item.username[0].toUpperCase()}</Text>
       </View>
@@ -58,7 +60,7 @@ export default function HomeScreen() {
   const renderCalls = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>📞 No recent calls</Text>
-      <Text style={styles.emptySubText}>Calls coming soon!</Text>
+      <Text style={styles.emptySubText}>Start a call from a chat!</Text>
     </View>
   );
 

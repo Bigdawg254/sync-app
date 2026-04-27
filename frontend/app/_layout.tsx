@@ -8,6 +8,8 @@ export default function Layout() {
       <Stack.Screen name="signup" />
       <Stack.Screen name="home" />
       <Stack.Screen name="chat" />
+      <Stack.Screen name="call" />
+      <Stack.Screen name="group-chat" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="find-friends" />
