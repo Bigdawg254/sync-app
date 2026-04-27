@@ -22,6 +22,17 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// TEST DB ROUTE
+app.get('/test-db', async (req, res) => {
+  const pool = require('./db');
+  try {
+    const result = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);

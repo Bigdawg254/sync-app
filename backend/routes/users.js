@@ -42,6 +42,8 @@ router.put('/:id', async (req, res) => {
       pictureUrl = uploaded.secure_url;
     }
 
+    const ageValue = age && !isNaN(age) ? parseInt(age) : null;
+
     const result = await pool.query(
       `UPDATE users SET 
         username=$1, 
@@ -51,7 +53,7 @@ router.put('/:id', async (req, res) => {
         profile_picture=COALESCE($5, profile_picture)
        WHERE id=$6 
        RETURNING id, username, bio, age, gender, profile_picture`,
-      [username, bio, age, gender, pictureUrl, id]
+      [username || '', bio || '', ageValue, gender || '', pictureUrl, id]
     );
     res.json(result.rows[0]);
   } catch (err) {
