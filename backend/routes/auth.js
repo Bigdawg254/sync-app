@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const pool = require('../db');
 
-// Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -55,7 +54,7 @@ router.post('/reset-password', async (req, res) => {
     }
     const resetToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const resetLink = `https://sync-app-production-2ff8.up.railway.app/reset/${resetToken}`;
-    
+
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,

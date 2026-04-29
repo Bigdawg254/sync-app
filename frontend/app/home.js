@@ -31,8 +31,8 @@ export default function HomeScreen() {
   };
 
   const renderChat = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.chatItem} 
+    <TouchableOpacity
+      style={styles.chatItem}
       onPress={() => router.push({ pathname: '/chat', params: { friendId: item.id, friendName: item.username } })}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{item.username[0].toUpperCase()}</Text>
@@ -71,6 +71,9 @@ export default function HomeScreen() {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.requestsBtn} onPress={() => router.push('/requests')}>
             <Text style={styles.requestsBtnText}>🔔</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.groupBtn} onPress={() => router.push('/group-chat')}>
+            <Text style={styles.groupBtnText}>👥</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.findBtn} onPress={() => router.push('/find-friends')}>
             <Text style={styles.findBtnText}>Find Friends</Text>
@@ -142,9 +145,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingTop: 50, backgroundColor: '#1a1a2e' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#6c63ff' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   requestsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2d2d44', justifyContent: 'center', alignItems: 'center' },
   requestsBtnText: { fontSize: 18 },
+  groupBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2d2d44', justifyContent: 'center', alignItems: 'center' },
+  groupBtnText: { fontSize: 18 },
   findBtn: { backgroundColor: '#6c63ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   findBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   profileIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#2d2d44', justifyContent: 'center', alignItems: 'center' },

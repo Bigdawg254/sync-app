@@ -2,13 +2,25 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const cloudinary = require('../cloudinary');
+const jwt = require('jsonwebtoken');
+
+// Auth middleware
+const authenticate = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Not authorized' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.id;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
 
 // GET all users
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, username, age, bio FROM users'
-    );
+    const result = await pool.query('SELECT id, username, age, bio FROM users');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -30,7 +42,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // UPDATE user profile
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
   const { username, bio, age, gender, profile_picture } = req.body;
   try {
@@ -42,7 +54,7 @@ router.put('/:id', async (req, res) => {
       pictureUrl = uploaded.secure_url;
     }
 
-    const ageValue = age && !isNaN(age) ? parseInt(age) : null;
+    const ageValue = age && !isNaN(parseInt(age)) ? parseInt(age) : null;
 
     const result = await pool.query(
       `UPDATE users SET 

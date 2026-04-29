@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +9,8 @@ const API = 'https://sync-app-production-2ff8.up.railway.app';
 export default function StatusScreen() {
   const router = useRouter();
   const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
 
   useEffect(() => {
     loadStatuses();
@@ -22,10 +24,11 @@ export default function StatusScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
-      setStatuses(data);
+      setStatuses(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log(err);
     }
+    setLoading(false);
   };
 
   const addStatus = async () => {
@@ -42,6 +45,7 @@ export default function StatusScreen() {
       base64: true
     });
     if (!result.canceled) {
+      setPosting(true);
       try {
         const userId = await SecureStore.getItemAsync('userId');
         const token = await SecureStore.getItemAsync('userToken');
@@ -59,10 +63,14 @@ export default function StatusScreen() {
         if (response.ok) {
           Alert.alert('Success', 'Status posted!');
           loadStatuses();
+        } else {
+          const data = await response.json();
+          Alert.alert('Error', data.error || 'Could not post status');
         }
       } catch (err) {
         Alert.alert('Error', 'Could not post status');
       }
+      setPosting(false);
     }
   };
 
@@ -75,21 +83,26 @@ export default function StatusScreen() {
         <Text style={styles.headerTitle}>Status</Text>
       </View>
 
-      <TouchableOpacity style={styles.myStatusRow} onPress={addStatus}>
+      <TouchableOpacity style={styles.myStatusRow} onPress={addStatus} disabled={posting}>
         <View style={styles.addAvatar}>
-          <Text style={styles.addAvatarText}>+</Text>
+          <Text style={styles.addAvatarText}>{posting ? '...' : '+'}</Text>
         </View>
         <View>
           <Text style={styles.myStatusTitle}>My Status</Text>
-          <Text style={styles.myStatusSubtitle}>Tap to add status update</Text>
+          <Text style={styles.myStatusSubtitle}>{posting ? 'Posting...' : 'Tap to add status update'}</Text>
         </View>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Recent Updates</Text>
 
-      {statuses.length === 0 ? (
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#6c63ff" />
+        </View>
+      ) : statuses.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyText}>No status updates yet</Text>
+          <Text style={styles.emptySubText}>Add your friends to see their status!</Text>
         </View>
       ) : (
         <FlatList
@@ -102,7 +115,9 @@ export default function StatusScreen() {
               </View>
               <View>
                 <Text style={styles.statusUsername}>{item.username}</Text>
-                <Text style={styles.statusTime}>Today</Text>
+                <Text style={styles.statusTime}>
+                  {new Date(item.created_at).toLocaleTimeString()}
+                </Text>
               </View>
             </TouchableOpacity>
           )}
@@ -125,6 +140,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#888', fontSize: 13, padding: 16, paddingBottom: 8 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#888', fontSize: 16 },
+  emptySubText: { color: '#555', fontSize: 13, marginTop: 8 },
   statusRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e1e1e', gap: 12 },
   statusAvatarRing: { width: 54, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   statusAvatar: { width: 48, height: 48, borderRadius: 24 },
