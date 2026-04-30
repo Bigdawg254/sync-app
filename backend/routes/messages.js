@@ -20,14 +20,24 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-// SEND a message
+// SEND message
 router.post('/', async (req, res) => {
   const { sender_id, receiver_id, content } = req.body;
   try {
+    if (!sender_id || !receiver_id || !content) {
+      return res.status(400).json({ error: 'sender_id, receiver_id and content required' });
+    }
     const result = await pool.query(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *',
       [sender_id, receiver_id, content]
     );
+
+    // Create notification for receiver
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [receiver_id, `You have a new message!`]
+    );
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });

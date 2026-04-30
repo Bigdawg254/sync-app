@@ -2,54 +2,77 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const cloudinary = require('../cloudinary');
+const authenticate = require('../middleware/auth');
 
-// POST new status
-router.post('/', async (req, res) => {
-  const { user_id, image } = req.body;
+// GET all users
+router.get('/', async (req, res) => {
   try {
-    let imageUrl = image;
-    if (image && image.startsWith('data:image')) {
-      const uploaded = await cloudinary.uploader.upload(image, {
-        folder: 'sync-app/statuses'
-      });
-      imageUrl = uploaded.secure_url;
-    }
-
     const result = await pool.query(
-      'INSERT INTO statuses (user_id, image, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'24 hours\') RETURNING *',
-      [user_id, imageUrl]
+      'SELECT id, username, age, bio, profile_picture FROM users ORDER BY created_at DESC'
     );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET single user
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT id, username, email, age, bio, gender, profile_picture FROM users WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET statuses of friends
-router.get('/:userId', async (req, res) => {
-  const { userId } = req.params;
+// UPDATE user profile
+router.put('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { username, bio, age, gender, profile_picture } = req.body;
   try {
+    let pictureUrl = null;
+
+    if (profile_picture && typeof profile_picture === 'string' && profile_picture.startsWith('data:image')) {
+      try {
+        const uploaded = await cloudinary.uploader.upload(profile_picture, {
+          folder: 'sync-app/profiles',
+          transformation: [{ width: 400, height: 400, crop: 'fill' }]
+        });
+        pictureUrl = uploaded.secure_url;
+      } catch (uploadErr) {
+        console.error('Cloudinary upload error:', uploadErr.message);
+      }
+    }
+
+    const ageValue = (age !== null && age !== undefined && age !== '' && !isNaN(parseInt(age))) 
+      ? parseInt(age) 
+      : null;
+
     const result = await pool.query(
-      `SELECT s.id, s.image, s.created_at, u.username, u.id as user_id
-       FROM statuses s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.expires_at > NOW()
-       AND (
-         s.user_id = $1
-         OR s.user_id IN (
-           SELECT CASE 
-             WHEN c.user_id = $1 THEN c.connected_user_id
-             ELSE c.user_id
-           END
-           FROM connections c
-           WHERE (c.user_id = $1 OR c.connected_user_id = $1)
-           AND c.status = 'accepted'
-         )
-       )
-       ORDER BY s.created_at DESC`,
-      [userId]
+      `UPDATE users SET 
+        username = COALESCE(NULLIF($1, ''), username),
+        bio = $2,
+        age = $3,
+        gender = $4,
+        profile_picture = COALESCE($5, profile_picture)
+       WHERE id = $6
+       RETURNING id, username, bio, age, gender, profile_picture, email`,
+      [username || null, bio || null, ageValue, gender || null, pictureUrl, id]
     );
-    res.json(result.rows);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
