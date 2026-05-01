@@ -1,19 +1,11 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import * as Notifications from 'expo-notifications';
 
+const { width, height } = Dimensions.get('window');
 const API = 'https://sync-app-production-2ff8.up.railway.app';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -25,7 +17,6 @@ export default function LoginScreen() {
   useEffect(() => {
     checkBiometrics();
     loadSavedCredentials();
-    registerForNotifications();
   }, []);
 
   const checkBiometrics = async () => {
@@ -40,20 +31,7 @@ export default function LoginScreen() {
       const savedPassword = await SecureStore.getItemAsync('userPassword');
       if (savedEmail) setEmail(savedEmail);
       if (savedPassword) setPassword(savedPassword);
-    } catch (err) {
-      console.log('No saved credentials');
-    }
-  };
-
-  const registerForNotifications = async () => {
-    try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') return;
-      const token = await Notifications.getExpoPushTokenAsync();
-      console.log('Push token:', token.data);
-    } catch (err) {
-      console.log('Notification error:', err);
-    }
+    } catch (err) {}
   };
 
   const handleBiometricLogin = async () => {
@@ -78,80 +56,131 @@ export default function LoginScreen() {
       const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailVal, password: passwordVal })
+        body: JSON.stringify({ email: emailVal.trim().toLowerCase(), password: passwordVal })
       });
       const data = await response.json();
       if (response.ok) {
-        await SecureStore.setItemAsync('userEmail', emailVal);
-        await SecureStore.setItemAsync('userPassword', passwordVal);
         await SecureStore.setItemAsync('userToken', data.token);
         await SecureStore.setItemAsync('userId', data.user.id.toString());
         await SecureStore.setItemAsync('username', data.user.username);
+        await SecureStore.setItemAsync('userEmail', emailVal.trim().toLowerCase());
+        await SecureStore.setItemAsync('userPassword', passwordVal);
         router.replace('/home');
       } else {
-        Alert.alert('Error', data.error);
+        Alert.alert('Login Failed', data.error);
       }
     } catch (err) {
-      Alert.alert('Error', 'Cannot connect to server');
+      Alert.alert('Error', 'Cannot connect to server. Check your internet.');
     }
     setLoading(false);
   };
 
-  const handleLogin = () => doLogin(email, password);
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Sync</Text>
-      <Text style={styles.subtitle}>Connect. Vibe. Belong.</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#888"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        {/* Anime-style header */}
+        <View style={styles.heroSection}>
+          <View style={styles.orbOuter}>
+            <View style={styles.orbInner}>
+              <Text style={styles.orbText}>S</Text>
+            </View>
+          </View>
+          <Text style={styles.appName}>SYNC</Text>
+          <Text style={styles.tagline}>✦ Connect Beyond Boundaries ✦</Text>
+        </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
-      </TouchableOpacity>
+        {/* Form */}
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Welcome Back</Text>
 
-      {biometricAvailable && (
-        <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
-          <Text style={styles.biometricText}>🔐 Login with Fingerprint</Text>
-        </TouchableOpacity>
-      )}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>EMAIL</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="your@email.com"
+              placeholderTextColor="#444"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
 
-      <TouchableOpacity onPress={() => router.push('/signup')}>
-        <Text style={styles.link}>Don't have an account? Sign Up</Text>
-      </TouchableOpacity>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>PASSWORD</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="••••••••"
+              placeholderTextColor="#444"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
 
-      <TouchableOpacity onPress={() => router.push('/reset-password')}>
-        <Text style={styles.forgot}>Forgot Password?</Text>
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity
+            style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
+            onPress={() => doLogin(email, password)}
+            disabled={loading}>
+            <Text style={styles.loginBtnText}>
+              {loading ? 'CONNECTING...' : 'LOGIN →'}
+            </Text>
+          </TouchableOpacity>
+
+          {biometricAvailable && (
+            <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
+              <Text style={styles.biometricText}>🔐  Use Fingerprint</Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity style={styles.signupBtn} onPress={() => router.push('/signup')}>
+            <Text style={styles.signupBtnText}>CREATE ACCOUNT</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.push('/reset-password')}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0f0f0f' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
-  subtitle: { color: '#888', textAlign: 'center', marginBottom: 40 },
-  input: { backgroundColor: '#1e1e1e', color: '#fff', padding: 14, borderRadius: 10, marginBottom: 16 },
-  button: { backgroundColor: '#6c63ff', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 16 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  biometricBtn: { backgroundColor: '#1e1e1e', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#6c63ff' },
-  biometricText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 16 },
-  link: { color: '#6c63ff', textAlign: 'center', marginTop: 10 },
-  forgot: { color: '#888', textAlign: 'center', marginTop: 16 }
+  container: { flex: 1, backgroundColor: '#050508' },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  heroSection: { alignItems: 'center', paddingTop: height * 0.08, paddingBottom: 30 },
+  orbOuter: { width: 110, height: 110, borderRadius: 55, borderWidth: 2, borderColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginBottom: 20, shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 20, elevation: 20 },
+  orbInner: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
+  orbText: { fontSize: 44, fontWeight: 'bold', color: '#fff' },
+  appName: { fontSize: 42, fontWeight: 'bold', color: '#fff', letterSpacing: 12 },
+  tagline: { color: '#6c63ff', fontSize: 13, marginTop: 8, letterSpacing: 2 },
+  formCard: { marginHorizontal: 20, backgroundColor: '#0d0d14', borderRadius: 24, padding: 28, borderWidth: 1, borderColor: '#1a1a2e' },
+  formTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
+  inputWrapper: { marginBottom: 20 },
+  inputLabel: { color: '#6c63ff', fontSize: 11, fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
+  input: { backgroundColor: '#111120', color: '#fff', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#1e1e3a' },
+  loginBtn: { backgroundColor: '#6c63ff', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  loginBtnDisabled: { backgroundColor: '#3a3760' },
+  loginBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 },
+  biometricBtn: { backgroundColor: '#111120', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: '#6c63ff' },
+  biometricText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 15 },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#1e1e3a' },
+  dividerText: { color: '#444', marginHorizontal: 12, fontSize: 12 },
+  signupBtn: { backgroundColor: 'transparent', padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#6c63ff' },
+  signupBtnText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 },
+  forgotText: { color: '#444', textAlign: 'center', marginTop: 20, fontSize: 14 },
 });

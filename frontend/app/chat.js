@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { io } from 'socket.io-client';
@@ -29,7 +29,6 @@ export default function ChatScreen() {
     const token = await SecureStore.getItemAsync('userToken');
     setUserId(id);
 
-    // Load message history
     try {
       const response = await fetch(`${API}/api/messages/${friendId}?senderId=${id}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -47,14 +46,10 @@ export default function ChatScreen() {
       console.log('Message load error:', err);
     }
 
-    // Setup socket
     const room = [id, friendId].sort().join('_');
     roomRef.current = room;
 
-    socketRef.current = io(API, {
-      transports: ['websocket'],
-      reconnection: true
-    });
+    socketRef.current = io(API, { transports: ['websocket'], reconnection: true });
 
     socketRef.current.on('connect', () => {
       setConnected(true);
@@ -69,7 +64,7 @@ export default function ChatScreen() {
           sender: 'them',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
-        setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       }
     });
 
@@ -89,27 +84,18 @@ export default function ChatScreen() {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages(prev => [...prev, newMsg]);
-    setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // Save to DB
     try {
       await fetch(`${API}/api/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          sender_id: userId,
-          receiver_id: friendId,
-          content: msgText
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sender_id: userId, receiver_id: friendId, content: msgText })
       });
     } catch (err) {
-      console.log('Save message error:', err);
+      console.log('Save error:', err);
     }
 
-    // Send via socket
     if (socketRef.current && roomRef.current) {
       socketRef.current.emit('send_message', {
         room: roomRef.current,
@@ -123,32 +109,37 @@ export default function ChatScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}>
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/home')}>
-          <Text style={styles.back}>←</Text>
+        <TouchableOpacity onPress={() => router.replace('/home')} style={styles.backBtn}>
+          <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>
-              {friendName ? friendName[0].toUpperCase() : '?'}
-            </Text>
+            <Text style={styles.headerAvatarText}>{friendName ? friendName[0].toUpperCase() : '?'}</Text>
           </View>
           <View>
-            <Text style={styles.headerTitle}>{friendName || 'Chat'}</Text>
+            <Text style={styles.headerName}>{friendName || 'Chat'}</Text>
             <Text style={styles.headerStatus}>{connected ? '🟢 Online' : '⚫ Connecting...'}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={() => router.push({ pathname: '/call', params: { friendId, friendName } })}>
-          <Text style={styles.callBtn}>📞</Text>
+        <TouchableOpacity
+          style={styles.callBtn}
+          onPress={() => router.push({ pathname: '/call', params: { friendId, friendName } })}>
+          <Text style={styles.callBtnText}>📞</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Messages */}
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => (
           <View style={[styles.bubbleWrap, item.sender === 'me' ? styles.meWrap : styles.themWrap]}>
             <View style={[styles.bubble, item.sender === 'me' ? styles.meBubble : styles.themBubble]}>
@@ -157,31 +148,31 @@ export default function ChatScreen() {
             </View>
           </View>
         )}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
           <View style={styles.emptyChat}>
-            <Text style={styles.emptyChatText}>Say hello to {friendName}! 👋</Text>
+            <Text style={styles.emptyChatEmoji}>👋</Text>
+            <Text style={styles.emptyChatText}>Say hello to {friendName}!</Text>
           </View>
         }
       />
 
+      {/* Input */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           placeholder="Message..."
-          placeholderTextColor="#555"
+          placeholderTextColor="#444"
           value={message}
           onChangeText={setMessage}
           multiline
           maxLength={1000}
-          onSubmitEditing={sendMessage}
         />
         <TouchableOpacity
           style={[styles.sendBtn, !message.trim() && styles.sendBtnDisabled]}
           onPress={sendMessage}
-          disabled={!message.trim()}>
-          <Text style={styles.sendText}>➤</Text>
+          disabled={!message.trim()}
+          activeOpacity={0.8}>
+          <Text style={styles.sendBtnText}>➤</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -189,29 +180,32 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingTop: 50, backgroundColor: '#1a1a2e' },
-  back: { color: '#6c63ff', fontSize: 22, paddingRight: 8 },
-  headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  headerAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  headerTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  headerStatus: { color: '#888', fontSize: 12 },
-  callBtn: { fontSize: 22 },
+  container: { flex: 1, backgroundColor: '#050508' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 12, backgroundColor: '#0d0d14', borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
+  backBtn: { padding: 8, marginRight: 4 },
+  backText: { color: '#6c63ff', fontSize: 24 },
+  headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
+  headerAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
+  headerName: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  headerStatus: { color: '#555', fontSize: 12, marginTop: 2 },
+  callBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111120', justifyContent: 'center', alignItems: 'center' },
+  callBtnText: { fontSize: 20 },
   messagesList: { padding: 16, paddingBottom: 8 },
   bubbleWrap: { marginBottom: 8 },
   meWrap: { alignItems: 'flex-end' },
   themWrap: { alignItems: 'flex-start' },
-  bubble: { maxWidth: '80%', padding: 12, borderRadius: 16 },
+  bubble: { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
   meBubble: { backgroundColor: '#6c63ff', borderBottomRightRadius: 4 },
-  themBubble: { backgroundColor: '#1e1e1e', borderBottomLeftRadius: 4 },
-  msgText: { color: '#fff', fontSize: 15 },
-  msgTime: { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 4, textAlign: 'right' },
-  emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
-  emptyChatText: { color: '#555', fontSize: 16 },
-  inputContainer: { flexDirection: 'row', padding: 12, backgroundColor: '#1a1a2e', alignItems: 'flex-end', gap: 8 },
-  input: { flex: 1, backgroundColor: '#2d2d44', color: '#fff', padding: 12, borderRadius: 20, maxHeight: 100, fontSize: 15 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: '#2d2d44' },
-  sendText: { color: '#fff', fontSize: 18 },
+  themBubble: { backgroundColor: '#111120', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1a1a2e' },
+  msgText: { color: '#fff', fontSize: 15, lineHeight: 20 },
+  msgTime: { color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4, textAlign: 'right' },
+  emptyChat: { alignItems: 'center', paddingTop: 80 },
+  emptyChatEmoji: { fontSize: 48, marginBottom: 12 },
+  emptyChatText: { color: '#444', fontSize: 16 },
+  inputContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12, backgroundColor: '#0d0d14', borderTopWidth: 1, borderTopColor: '#1a1a2e', alignItems: 'flex-end', gap: 10 },
+  input: { flex: 1, backgroundColor: '#111120', color: '#fff', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24, maxHeight: 120, fontSize: 15, borderWidth: 1, borderColor: '#1e1e3a' },
+  sendBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
+  sendBtnDisabled: { backgroundColor: '#1a1a2e' },
+  sendBtnText: { color: '#fff', fontSize: 20 },
 });

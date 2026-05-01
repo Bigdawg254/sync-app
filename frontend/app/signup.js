@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -48,32 +48,71 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Join Sync</Text>
-      <Text style={styles.subtitle}>Find your vibe</Text>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.replace('/login')} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
 
-      <TextInput style={styles.input} placeholder="Username *" placeholderTextColor="#888" value={username} onChangeText={setUsername} autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Email *" placeholderTextColor="#888" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Password *" placeholderTextColor="#888" secureTextEntry value={password} onChangeText={setPassword} />
-      <TextInput style={styles.input} placeholder="Age (optional)" placeholderTextColor="#888" keyboardType="numeric" value={age} onChangeText={setAge} />
+        <View style={styles.heroSection}>
+          <Text style={styles.appName}>SYNC</Text>
+          <Text style={styles.tagline}>✦ Join the Community ✦</Text>
+        </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
-      </TouchableOpacity>
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Create Account</Text>
 
-      <TouchableOpacity onPress={() => router.replace('/login')}>
-        <Text style={styles.link}>Already have an account? Login</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>USERNAME *</Text>
+            <TextInput style={styles.input} placeholder="Choose a username" placeholderTextColor="#444" value={username} onChangeText={setUsername} autoCapitalize="none" />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>EMAIL *</Text>
+            <TextInput style={styles.input} placeholder="your@email.com" placeholderTextColor="#444" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>PASSWORD *</Text>
+            <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#444" secureTextEntry value={password} onChangeText={setPassword} />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>AGE (OPTIONAL)</Text>
+            <TextInput style={styles.input} placeholder="Your age" placeholderTextColor="#444" keyboardType="numeric" value={age} onChangeText={setAge} />
+          </View>
+
+          <TouchableOpacity style={[styles.signupBtn, loading && styles.signupBtnDisabled]} onPress={handleSignup} disabled={loading}>
+            <Text style={styles.signupBtnText}>{loading ? 'CREATING...' : 'CREATE ACCOUNT →'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.replace('/login')}>
+            <Text style={styles.loginText}>Already have an account? Login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0f0f0f' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
-  subtitle: { color: '#888', textAlign: 'center', marginBottom: 40 },
-  input: { backgroundColor: '#1e1e1e', color: '#fff', padding: 14, borderRadius: 10, marginBottom: 16 },
-  button: { backgroundColor: '#6c63ff', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 16 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  link: { color: '#6c63ff', textAlign: 'center', marginTop: 10 }
+  container: { flex: 1, backgroundColor: '#050508' },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  header: { paddingTop: 50, paddingHorizontal: 20 },
+  backBtn: { padding: 8 },
+  backText: { color: '#6c63ff', fontSize: 16 },
+  heroSection: { alignItems: 'center', paddingVertical: 24 },
+  appName: { fontSize: 36, fontWeight: 'bold', color: '#fff', letterSpacing: 12 },
+  tagline: { color: '#6c63ff', fontSize: 13, marginTop: 8, letterSpacing: 2 },
+  formCard: { marginHorizontal: 20, backgroundColor: '#0d0d14', borderRadius: 24, padding: 28, borderWidth: 1, borderColor: '#1a1a2e' },
+  formTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
+  inputWrapper: { marginBottom: 20 },
+  inputLabel: { color: '#6c63ff', fontSize: 11, fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
+  input: { backgroundColor: '#111120', color: '#fff', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#1e1e3a' },
+  signupBtn: { backgroundColor: '#6c63ff', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  signupBtnDisabled: { backgroundColor: '#3a3760' },
+  signupBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 },
+  loginText: { color: '#6c63ff', textAlign: 'center', marginTop: 20, fontSize: 14 },
 });
