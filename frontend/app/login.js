@@ -62,31 +62,32 @@ export default function LoginScreen() {
       fallbackLabel: 'Use Password'
     });
     if (result.success) {
-      router.push('/home');
-    } else {
-      Alert.alert('Failed', 'Biometric authentication failed');
+      const savedEmail = await SecureStore.getItemAsync('userEmail');
+      const savedPassword = await SecureStore.getItemAsync('userPassword');
+      if (savedEmail && savedPassword) {
+        await doLogin(savedEmail, savedPassword);
+      } else {
+        Alert.alert('Error', 'Please login with email first');
+      }
     }
   };
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+  const doLogin = async (emailVal, passwordVal) => {
     setLoading(true);
     try {
       const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: emailVal, password: passwordVal })
       });
       const data = await response.json();
       if (response.ok) {
-        await SecureStore.setItemAsync('userEmail', email);
-        await SecureStore.setItemAsync('userPassword', password);
+        await SecureStore.setItemAsync('userEmail', emailVal);
+        await SecureStore.setItemAsync('userPassword', passwordVal);
         await SecureStore.setItemAsync('userToken', data.token);
         await SecureStore.setItemAsync('userId', data.user.id.toString());
-        router.push('/home');
+        await SecureStore.setItemAsync('username', data.user.username);
+        router.replace('/home');
       } else {
         Alert.alert('Error', data.error);
       }
@@ -96,15 +97,32 @@ export default function LoginScreen() {
     setLoading(false);
   };
 
+  const handleLogin = () => doLogin(email, password);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome to Sync</Text>
       <Text style={styles.subtitle}>Connect. Vibe. Belong.</Text>
 
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#888" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#888" secureTextEntry value={password} onChangeText={setPassword} />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor="#888"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        placeholderTextColor="#888"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
         <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
       </TouchableOpacity>
 

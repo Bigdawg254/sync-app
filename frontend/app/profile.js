@@ -52,10 +52,7 @@ export default function ProfileScreen() {
   };
 
   const saveProfilePicture = async () => {
-    if (!imageBase64) {
-      Alert.alert('No image', 'Please select an image first');
-      return;
-    }
+    if (!imageBase64) return;
     setSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
@@ -64,7 +61,7 @@ export default function ProfileScreen() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           username: user.username,
@@ -79,6 +76,7 @@ export default function ProfileScreen() {
         Alert.alert('Success', 'Profile picture saved!');
         setImage(data.profile_picture);
         setImageBase64(null);
+        setUser(data);
       } else {
         Alert.alert('Error', data.error);
       }
@@ -88,7 +86,7 @@ export default function ProfileScreen() {
     setSaving(false);
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
       'Are you sure? This cannot be undone!',
@@ -99,21 +97,22 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await SecureStore.getItemAsync('userToken');
               const userId = await SecureStore.getItemAsync('userId');
               const response = await fetch(`${API}/api/auth/delete/${userId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
+                method: 'DELETE'
               });
               if (response.ok) {
                 await SecureStore.deleteItemAsync('userToken');
                 await SecureStore.deleteItemAsync('userId');
                 await SecureStore.deleteItemAsync('userEmail');
                 await SecureStore.deleteItemAsync('userPassword');
+                await SecureStore.deleteItemAsync('username');
                 router.replace('/login');
+              } else {
+                Alert.alert('Error', 'Could not delete account');
               }
             } catch (err) {
-              Alert.alert('Error', 'Cannot delete account');
+              Alert.alert('Error', 'Cannot connect to server');
             }
           }
         }
@@ -126,6 +125,7 @@ export default function ProfileScreen() {
     await SecureStore.deleteItemAsync('userId');
     await SecureStore.deleteItemAsync('userEmail');
     await SecureStore.deleteItemAsync('userPassword');
+    await SecureStore.deleteItemAsync('username');
     router.replace('/login');
   };
 
@@ -153,8 +153,8 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {imageBase64 && (
-          <TouchableOpacity style={styles.savePhotoBtn} onPress={saveProfilePicture}>
-            <Text style={styles.savePhotoBtnText}>{saving ? 'Saving...' : 'Save Photo'}</Text>
+          <TouchableOpacity style={styles.savePhotoBtn} onPress={saveProfilePicture} disabled={saving}>
+            <Text style={styles.savePhotoBtnText}>{saving ? 'Saving...' : '💾 Save Photo'}</Text>
           </TouchableOpacity>
         )}
 
@@ -163,12 +163,12 @@ export default function ProfileScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>📧 {user?.email}</Text>
-          <Text style={styles.infoText}>🎂 Age: {user?.age}</Text>
+          <Text style={styles.infoText}>🎂 Age: {user?.age || 'Not set'}</Text>
           <Text style={styles.infoText}>⚧ {user?.gender || 'Not set'}</Text>
         </View>
 
         <TouchableOpacity style={styles.button} onPress={() => router.push('/edit-profile')}>
-          <Text style={styles.buttonText}>Edit Profile</Text>
+          <Text style={styles.buttonText}>✏️ Edit Profile</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
-          <Text style={styles.deleteText}>Delete Account</Text>
+          <Text style={styles.deleteText}>🗑️ Delete Account</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -189,19 +189,19 @@ const styles = StyleSheet.create({
   back: { color: '#6c63ff', fontSize: 16 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   content: { alignItems: 'center', padding: 24 },
-  avatar: { width: 90, height: 90, borderRadius: 45 },
-  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 36, color: '#fff', fontWeight: 'bold' },
+  avatar: { width: 100, height: 100, borderRadius: 50 },
+  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 40, color: '#fff', fontWeight: 'bold' },
   changePhoto: { color: '#6c63ff', textAlign: 'center', marginTop: 8, marginBottom: 8 },
-  savePhotoBtn: { backgroundColor: '#00c853', padding: 10, borderRadius: 10, marginBottom: 16 },
+  savePhotoBtn: { backgroundColor: '#00c853', padding: 12, borderRadius: 10, marginBottom: 16, paddingHorizontal: 24 },
   savePhotoBtnText: { color: '#fff', fontWeight: 'bold' },
   username: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 8 },
-  bio: { color: '#888', marginTop: 8, textAlign: 'center' },
-  infoBox: { backgroundColor: '#1e1e1e', borderRadius: 12, padding: 16, width: '100%', marginTop: 24 },
+  bio: { color: '#888', marginTop: 8, textAlign: 'center', marginBottom: 8 },
+  infoBox: { backgroundColor: '#1e1e1e', borderRadius: 12, padding: 16, width: '100%', marginTop: 16 },
   infoText: { color: '#aaa', marginBottom: 10, fontSize: 15 },
-  button: { backgroundColor: '#6c63ff', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 24 },
+  button: { backgroundColor: '#6c63ff', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginTop: 20 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  logoutBtn: { marginTop: 16 },
+  logoutBtn: { marginTop: 20 },
   logoutText: { color: '#ff4d4d', fontSize: 15 },
   deleteBtn: { marginTop: 16, marginBottom: 40 },
   deleteText: { color: '#ff0000', fontSize: 15, fontWeight: 'bold' }
