@@ -1,6 +1,9 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+
+const API = 'https://sync-app-production-2ff8.up.railway.app';
 
 export default function SignupScreen() {
   const [username, setUsername] = useState('');
@@ -11,20 +14,30 @@ export default function SignupScreen() {
   const router = useRouter();
 
   const handleSignup = async () => {
-    if (!username || !email || !password || !age) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!username || !email || !password) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
     setLoading(true);
     try {
-      const response = await fetch('https://sync-app-production-2ff8.up.railway.app/api/auth/signup', {
+      const response = await fetch(`${API}/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password, age: parseInt(age) })
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          age: age ? parseInt(age) : null
+        })
       });
       const data = await response.json();
       if (response.ok) {
-        router.push('/home');
+        await SecureStore.setItemAsync('userToken', data.token);
+        await SecureStore.setItemAsync('userId', data.user.id.toString());
+        await SecureStore.setItemAsync('username', data.user.username);
+        await SecureStore.setItemAsync('userEmail', email.trim().toLowerCase());
+        await SecureStore.setItemAsync('userPassword', password);
+        router.replace('/home');
       } else {
         Alert.alert('Error', data.error);
       }
@@ -35,25 +48,28 @@ export default function SignupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Join Sync</Text>
       <Text style={styles.subtitle}>Find your vibe</Text>
-      <TextInput style={styles.input} placeholder="Username" placeholderTextColor="#888" value={username} onChangeText={setUsername} />
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#888" value={email} onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#888" secureTextEntry value={password} onChangeText={setPassword} />
-      <TextInput style={styles.input} placeholder="Age" placeholderTextColor="#888" keyboardType="numeric" value={age} onChangeText={setAge} />
-      <TouchableOpacity style={styles.button} onPress={handleSignup}>
+
+      <TextInput style={styles.input} placeholder="Username *" placeholderTextColor="#888" value={username} onChangeText={setUsername} autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Email *" placeholderTextColor="#888" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Password *" placeholderTextColor="#888" secureTextEntry value={password} onChangeText={setPassword} />
+      <TextInput style={styles.input} placeholder="Age (optional)" placeholderTextColor="#888" keyboardType="numeric" value={age} onChangeText={setAge} />
+
+      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
         <Text style={styles.buttonText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/login')}>
+
+      <TouchableOpacity onPress={() => router.replace('/login')}>
         <Text style={styles.link}>Already have an account? Login</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0f0f0f' },
+  container: { flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0f0f0f' },
   title: { fontSize: 32, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
   subtitle: { color: '#888', textAlign: 'center', marginBottom: 40 },
   input: { backgroundColor: '#1e1e1e', color: '#fff', padding: 14, borderRadius: 10, marginBottom: 16 },
