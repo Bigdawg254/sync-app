@@ -17,6 +17,8 @@ export default function Layout() {
       <Stack.Screen name="random-match" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="status" />
+      <Stack.Screen name="user-profile" />
+      <Stack.Screen name="chat-options" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }} />
     </Stack>
   );
 }
