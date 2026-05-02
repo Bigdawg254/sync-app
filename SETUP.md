@@ -299,7 +299,7 @@ For issues or questions:
 
 <div align="center">
 
-**Made with ❤️ & ⚡ by [Bigdawg254](https://github.com/Bigdawg254)**
+**Made by [Bigdawg254](https://github.com/Bigdawg254)**
 
 [Report Bug](https://github.com/Bigdawg254/sync-app/issues) · [Request Feature](https://github.com/Bigdawg254/sync-app/issues) · [Live Demo](https://sync-app-hazel.vercel.app)
 

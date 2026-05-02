@@ -1,14 +1,11 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Dimensions, Image } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { useFocusEffect } from 'expo-router';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const API = 'https://sync-app-production-2ff8.up.railway.app';
-
-const LOGO_COLORS = ['#6c63ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff'];
-const LOGO_FONTS = [28, 32, 26, 30, 28];
+const COLORS = ['#6c63ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff9a3c'];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -16,27 +13,26 @@ export default function HomeScreen() {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifCount, setNotifCount] = useState(0);
-  const [logoColorIndex, setLogoColorIndex] = useState(0);
-  const [logoFontIndex, setLogoFontIndex] = useState(0);
+  const [colorIdx, setColorIdx] = useState(0);
   const logoAnim = useRef(new Animated.Value(1)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
 
-  useFocusEffect(
-    useCallback(() => {
-      loadFriends();
-      loadNotifCount();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => {
+    loadFriends();
+    loadNotifs();
+  }, []));
 
   useEffect(() => {
     const interval = setInterval(() => {
       Animated.sequence([
-        Animated.timing(logoAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-        Animated.timing(logoAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]).start();
-      setTimeout(() => {
-        setLogoColorIndex(prev => (prev + 1) % LOGO_COLORS.length);
-        setLogoFontIndex(prev => (prev + 1) % LOGO_FONTS.length);
-      }, 300);
+      Animated.sequence([
+        Animated.timing(logoAnim, { toValue: 1.15, duration: 400, useNativeDriver: true }),
+        Animated.timing(logoAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]).start();
+      setTimeout(() => setColorIdx(p => (p + 1) % COLORS.length), 400);
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -45,117 +41,122 @@ export default function HomeScreen() {
     try {
       const userId = await SecureStore.getItemAsync('userId');
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${API}/api/connections/${userId}`, {
+      const res = await fetch(`${API}/api/connections/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
+      const data = await res.json();
       setFriends(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.log(err);
-    }
+    } catch {}
     setLoading(false);
   };
 
-  const loadNotifCount = async () => {
+  const loadNotifs = async () => {
     try {
       const userId = await SecureStore.getItemAsync('userId');
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${API}/api/connections/notifications/${userId}`, {
+      const res = await fetch(`${API}/api/connections/notifications/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setNotifCount(data.filter(n => !n.is_read).length);
-      }
-    } catch (err) {}
+      const data = await res.json();
+      if (Array.isArray(data)) setNotifCount(data.filter(n => !n.is_read).length);
+    } catch {}
   };
 
   const renderFriend = ({ item }) => (
     <TouchableOpacity
-      style={styles.chatItem}
+      style={styles.chatRow}
       onPress={() => router.push({ pathname: '/chat', params: { friendId: item.id, friendName: item.username } })}
       onLongPress={() => router.push({ pathname: '/chat-options', params: { friendId: item.id, friendName: item.username } })}
-      activeOpacity={0.7}>
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/user-profile', params: { userId: item.id } })}
-        activeOpacity={0.8}>
+      activeOpacity={0.75}>
+      <TouchableOpacity onPress={() => router.push({ pathname: '/user-profile', params: { userId: item.id } })} activeOpacity={0.8}>
         {item.profile_picture ? (
-          <Animated.Image
-            source={{ uri: item.profile_picture }}
-            style={[styles.chatAvatar, { opacity: logoAnim }]}
-          />
+          <Image source={{ uri: item.profile_picture }} style={styles.chatAvatar} />
         ) : (
-          <View style={styles.chatAvatarPlaceholder}>
-            <Text style={styles.chatAvatarText}>{item.username[0].toUpperCase()}</Text>
+          <View style={[styles.chatAvatarFallback, { backgroundColor: COLORS[item.id % COLORS.length] }]}>
+            <Text style={styles.chatAvatarLetter}>{item.username[0].toUpperCase()}</Text>
           </View>
         )}
-        <View style={styles.onlineDot} />
+        <View style={styles.onlinePip} />
       </TouchableOpacity>
-      <View style={styles.chatInfo}>
-        <Text style={styles.chatName}>{item.username}</Text>
-        <Text style={styles.lastMessage}>Tap to start chatting</Text>
+      <View style={styles.chatMeta}>
+        <View style={styles.chatMetaTop}>
+          <Text style={styles.chatName}>{item.username}</Text>
+          <Text style={styles.chatTime}>now</Text>
+        </View>
+        <Text style={styles.chatPreview}>Tap to start chatting ✨</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Text style={styles.chatChevron}>›</Text>
     </TouchableOpacity>
   );
 
+  const tabs = [
+    { key: 'chats', icon: '💬', label: 'Chats' },
+    { key: 'groups', icon: '👥', label: 'Groups' },
+    { key: 'status', icon: '⭕', label: 'Status' },
+    { key: 'calls', icon: '📞', label: 'Calls' },
+  ];
+
   return (
     <View style={styles.container}>
+      {/* Background orbs */}
+      <View style={styles.bgOrb1} />
+      <View style={styles.bgOrb2} />
+
       {/* Header */}
       <View style={styles.header}>
-        <Animated.Text style={[styles.headerTitle, { opacity: logoAnim, color: LOGO_COLORS[logoColorIndex], fontSize: LOGO_FONTS[logoFontIndex] }]}>
+        <Animated.Text style={[styles.logo, { color: COLORS[colorIdx], transform: [{ scale: logoAnim }], opacity: logoOpacity }]}>
           SYNC
         </Animated.Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/requests')} activeOpacity={0.7}>
-            <Text style={styles.iconBtnText}>🔔</Text>
+        <View style={styles.headerBtns}>
+          <TouchableOpacity style={styles.hBtn} onPress={() => router.push('/requests')} activeOpacity={0.7}>
+            <Text style={styles.hBtnIcon}>🔔</Text>
             {notifCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{notifCount > 9 ? '9+' : notifCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/find-friends')} activeOpacity={0.7}>
-            <Text style={styles.iconBtnText}>🔍</Text>
+          <TouchableOpacity style={styles.hBtn} onPress={() => router.push('/find-friends')} activeOpacity={0.7}>
+            <Text style={styles.hBtnIcon}>🔍</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/profile')} activeOpacity={0.7}>
-            <Text style={styles.iconBtnText}>👤</Text>
+          <TouchableOpacity style={styles.hBtn} onPress={() => router.push('/profile')} activeOpacity={0.7}>
+            <Text style={styles.hBtnIcon}>👤</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Tabs - WhatsApp style */}
+      {/* Tabs */}
       <View style={styles.tabs}>
-        {[
-          { key: 'chats', label: '💬 Chats' },
-          { key: 'groups', label: '👥 Groups' },
-          { key: 'status', label: '⭕ Status' },
-          { key: 'calls', label: '📞 Calls' },
-        ].map(tab => (
+        {tabs.map(tab => (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             onPress={() => setActiveTab(tab.key)}
             activeOpacity={0.7}>
-            <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>
-              {tab.label}
-            </Text>
+            <Text style={styles.tabIcon}>{tab.icon}</Text>
+            <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>{tab.label}</Text>
+            {activeTab === tab.key && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* CHATS TAB */}
+      {/* CHATS */}
       {activeTab === 'chats' && (
         <View style={styles.flex}>
-          <TouchableOpacity style={styles.randomBanner} onPress={() => router.push('/random-match')} activeOpacity={0.8}>
-            <View style={styles.randomLeft}>
-              <Text style={styles.randomEmoji}>🎲</Text>
+          {/* Random Match Card */}
+          <TouchableOpacity style={styles.randomCard} onPress={() => router.push('/random-match')} activeOpacity={0.85}>
+            <View style={styles.randomCardLeft}>
+              <View style={styles.randomCardIcon}>
+                <Text style={styles.randomCardIconText}>🎲</Text>
+              </View>
               <View>
-                <Text style={styles.randomTitle}>Random Match</Text>
-                <Text style={styles.randomSub}>Meet someone anonymously</Text>
+                <Text style={styles.randomCardTitle}>Random Match</Text>
+                <Text style={styles.randomCardSub}>Meet someone anonymously</Text>
               </View>
             </View>
-            <Text style={styles.randomArrow}>›</Text>
+            <View style={styles.randomCardArrow}>
+              <Text style={styles.randomCardArrowText}>›</Text>
+            </View>
           </TouchableOpacity>
 
           {loading ? (
@@ -164,9 +165,9 @@ export default function HomeScreen() {
             </View>
           ) : friends.length === 0 ? (
             <View style={styles.center}>
-              <Text style={styles.emptyEmoji}>💬</Text>
+              <Text style={styles.emptyIcon}>💬</Text>
               <Text style={styles.emptyTitle}>No chats yet</Text>
-              <Text style={styles.emptySub}>Find friends to start chatting!</Text>
+              <Text style={styles.emptySub}>Find friends and start talking!</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/find-friends')}>
                 <Text style={styles.emptyBtnText}>🔍  Find Friends</Text>
               </TouchableOpacity>
@@ -174,7 +175,7 @@ export default function HomeScreen() {
           ) : (
             <FlatList
               data={friends}
-              keyExtractor={(item) => item.id.toString()}
+              keyExtractor={item => item.id.toString()}
               renderItem={renderFriend}
               showsVerticalScrollIndicator={false}
             />
@@ -182,105 +183,116 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* GROUPS TAB */}
+      {/* GROUPS */}
       {activeTab === 'groups' && (
         <View style={styles.flex}>
-          <TouchableOpacity style={styles.createGroupBtn} onPress={() => router.push('/group-chat')} activeOpacity={0.8}>
-            <Text style={styles.createGroupIcon}>➕</Text>
-            <Text style={styles.createGroupText}>Create or Join a Group</Text>
+          <TouchableOpacity style={styles.createGroupRow} onPress={() => router.push('/group-chat')} activeOpacity={0.8}>
+            <View style={styles.createGroupIcon}><Text style={styles.createGroupIconText}>➕</Text></View>
+            <View>
+              <Text style={styles.createGroupTitle}>New Group</Text>
+              <Text style={styles.createGroupSub}>Create or join a group chat</Text>
+            </View>
           </TouchableOpacity>
           <View style={styles.center}>
-            <Text style={styles.emptyEmoji}>👥</Text>
+            <Text style={styles.emptyIcon}>👥</Text>
             <Text style={styles.emptyTitle}>No Groups Yet</Text>
-            <Text style={styles.emptySub}>Create a group and share the code with friends to chat together</Text>
+            <Text style={styles.emptySub}>Create a group and share the code with friends</Text>
             <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/group-chat')}>
-              <Text style={styles.emptyBtnText}>➕  New Group</Text>
+              <Text style={styles.emptyBtnText}>➕  Create Group</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* STATUS TAB */}
+      {/* STATUS */}
       {activeTab === 'status' && (
         <View style={styles.flex}>
           <TouchableOpacity style={styles.myStatusRow} onPress={() => router.push('/status')} activeOpacity={0.8}>
-            <View style={styles.statusAddBtn}>
-              <Text style={styles.statusAddText}>+</Text>
-            </View>
+            <View style={styles.myStatusIcon}><Text style={styles.myStatusIconText}>+</Text></View>
             <View>
               <Text style={styles.myStatusTitle}>My Status</Text>
-              <Text style={styles.myStatusSub}>Tap to add a status update</Text>
+              <Text style={styles.myStatusSub}>Tap to add or view status updates</Text>
             </View>
           </TouchableOpacity>
           <View style={styles.center}>
-            <Text style={styles.emptyEmoji}>⭕</Text>
+            <Text style={styles.emptyIcon}>⭕</Text>
             <Text style={styles.emptyTitle}>No Status Updates</Text>
             <Text style={styles.emptySub}>Add friends to see their status updates here</Text>
           </View>
         </View>
       )}
 
-      {/* CALLS TAB */}
+      {/* CALLS */}
       {activeTab === 'calls' && (
         <View style={styles.center}>
-          <Text style={styles.emptyEmoji}>📞</Text>
+          <Text style={styles.emptyIcon}>📞</Text>
           <Text style={styles.emptyTitle}>No Recent Calls</Text>
           <Text style={styles.emptySub}>Start a call from any chat conversation</Text>
         </View>
       )}
 
-      {/* FAB - New Chat Button */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/find-friends')} activeOpacity={0.8}>
-        <Text style={styles.fabText}>✉️</Text>
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/find-friends')} activeOpacity={0.85}>
+        <Text style={styles.fabIcon}>✉️</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050508' },
+  container: { flex: 1, backgroundColor: '#02020a' },
   flex: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 14, backgroundColor: '#0d0d14', borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
-  headerTitle: { fontWeight: 'bold', letterSpacing: 6 },
-  headerActions: { flexDirection: 'row', gap: 6 },
-  iconBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#111120', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  iconBtnText: { fontSize: 20 },
+  bgOrb1: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(108,99,255,0.08)', top: -60, right: -80, zIndex: 0 },
+  bgOrb2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(108,99,255,0.05)', bottom: 100, left: -60, zIndex: 0 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 54 : 44, paddingBottom: 14, zIndex: 1 },
+  logo: { fontSize: 28, fontWeight: 'bold', letterSpacing: 10 },
+  headerBtns: { flexDirection: 'row', gap: 6 },
+  hBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#080814', justifyContent: 'center', alignItems: 'center', position: 'relative', borderWidth: 1, borderColor: '#111125' },
+  hBtnIcon: { fontSize: 20 },
   badge: { position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ff4d4d', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  tabs: { flexDirection: 'row', backgroundColor: '#0d0d14' },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeTab: { borderBottomColor: '#6c63ff' },
-  tabText: { color: '#444', fontWeight: '600', fontSize: 11 },
-  activeTabText: { color: '#6c63ff' },
-  randomBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginVertical: 12, padding: 16, backgroundColor: '#0d0d14', borderRadius: 16, borderWidth: 1, borderColor: '#6c63ff' },
-  randomLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  randomEmoji: { fontSize: 32 },
-  randomTitle: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  randomSub: { color: '#555', fontSize: 12, marginTop: 2 },
-  randomArrow: { color: '#6c63ff', fontSize: 28 },
-  chatItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#0d0d14' },
-  chatAvatar: { width: 54, height: 54, borderRadius: 27 },
-  chatAvatarPlaceholder: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  chatAvatarText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  onlineDot: { position: 'absolute', bottom: 2, right: 2, width: 13, height: 13, borderRadius: 7, backgroundColor: '#00e676', borderWidth: 2, borderColor: '#050508' },
-  chatInfo: { flex: 1, marginLeft: 14 },
-  chatName: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  lastMessage: { color: '#444', fontSize: 13, marginTop: 3 },
-  chevron: { color: '#333', fontSize: 24 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyEmoji: { fontSize: 56, marginBottom: 16 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  emptySub: { color: '#444', fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 },
-  emptyBtn: { backgroundColor: '#6c63ff', paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12, marginTop: 24 },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
+  tabs: { flexDirection: 'row', backgroundColor: '#06060f', borderBottomWidth: 1, borderBottomColor: '#0d0d1a', zIndex: 1 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 12, position: 'relative' },
+  tabActive: {},
+  tabIcon: { fontSize: 18, marginBottom: 3 },
+  tabLabel: { color: '#333', fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+  tabLabelActive: { color: '#6c63ff' },
+  tabIndicator: { position: 'absolute', bottom: 0, left: '20%', right: '20%', height: 2, backgroundColor: '#6c63ff', borderRadius: 1 },
+  randomCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginVertical: 14, padding: 18, backgroundColor: '#080814', borderRadius: 20, borderWidth: 1, borderColor: '#6c63ff33' },
+  randomCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  randomCardIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#6c63ff22', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#6c63ff44' },
+  randomCardIconText: { fontSize: 26 },
+  randomCardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  randomCardSub: { color: '#444', fontSize: 12, marginTop: 2 },
+  randomCardArrow: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#6c63ff22', justifyContent: 'center', alignItems: 'center' },
+  randomCardArrowText: { color: '#6c63ff', fontSize: 22 },
+  chatRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#06060f' },
+  chatAvatar: { width: 56, height: 56, borderRadius: 28 },
+  chatAvatarFallback: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
+  chatAvatarLetter: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  onlinePip: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#00e676', borderWidth: 2.5, borderColor: '#02020a' },
+  chatMeta: { flex: 1, marginLeft: 14 },
+  chatMetaTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  chatName: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  chatTime: { color: '#333', fontSize: 11 },
+  chatPreview: { color: '#333', fontSize: 13 },
+  chatChevron: { color: '#222', fontSize: 24, marginLeft: 8 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  emptyIcon: { fontSize: 60, marginBottom: 20 },
+  emptyTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
+  emptySub: { color: '#333', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  emptyBtn: { backgroundColor: '#6c63ff', paddingHorizontal: 28, paddingVertical: 16, borderRadius: 14, marginTop: 28, shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   emptyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  createGroupBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginVertical: 12, padding: 16, backgroundColor: '#0d0d14', borderRadius: 16, borderWidth: 1, borderColor: '#1a1a2e' },
-  createGroupIcon: { fontSize: 24 },
-  createGroupText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  myStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#0d0d14' },
-  statusAddBtn: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  statusAddText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
+  createGroupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 16, marginVertical: 14, padding: 18, backgroundColor: '#080814', borderRadius: 20, borderWidth: 1, borderColor: '#111125' },
+  createGroupIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#6c63ff22', justifyContent: 'center', alignItems: 'center' },
+  createGroupIconText: { fontSize: 24 },
+  createGroupTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  createGroupSub: { color: '#444', fontSize: 12, marginTop: 2 },
+  myStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#06060f' },
+  myStatusIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#8a83ff' },
+  myStatusIconText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
   myStatusTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  myStatusSub: { color: '#555', fontSize: 13, marginTop: 2 },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 60, height: 60, borderRadius: 30, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
-  fabText: { fontSize: 26 },
+  myStatusSub: { color: '#444', fontSize: 13, marginTop: 2 },
+  fab: { position: 'absolute', bottom: 28, right: 24, width: 62, height: 62, borderRadius: 31, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 12, zIndex: 10 },
+  fabIcon: { fontSize: 28 },
 });

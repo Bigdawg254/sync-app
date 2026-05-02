@@ -1,78 +1,70 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const cloudinary = require('../cloudinary');
-const authenticate = require('../middleware/auth');
 
-// GET all users
-router.get('/', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, username, age, bio, profile_picture FROM users ORDER BY created_at DESC'
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+let cloudinary;
+try {
+  cloudinary = require('../cloudinary');
+} catch(e) {
+  console.log('Cloudinary not configured');
+}
 
-// GET single user
-router.get('/:id', async (req, res) => {
-  const { id } = req.params;
+router.post('/', async (req, res) => {
+  const { user_id, image } = req.body;
   try {
-    const result = await pool.query(
-      'SELECT id, username, email, age, bio, gender, profile_picture FROM users WHERE id = $1',
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!user_id || !image) {
+      return res.status(400).json({ error: 'user_id and image required' });
     }
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// UPDATE user profile
-router.put('/:id', authenticate, async (req, res) => {
-  const { id } = req.params;
-  const { username, bio, age, gender, profile_picture } = req.body;
-  try {
-    let pictureUrl = null;
+    let imageUrl = image;
 
-    if (profile_picture && typeof profile_picture === 'string' && profile_picture.startsWith('data:image')) {
+    if (image.startsWith('data:image') && cloudinary) {
       try {
-        const uploaded = await cloudinary.uploader.upload(profile_picture, {
-          folder: 'sync-app/profiles',
-          transformation: [{ width: 400, height: 400, crop: 'fill' }]
+        const uploaded = await cloudinary.uploader.upload(image, {
+          folder: 'sync-app/statuses',
+          resource_type: 'image',
+          transformation: [{ width: 1080, crop: 'scale' }]
         });
-        pictureUrl = uploaded.secure_url;
+        imageUrl = uploaded.secure_url;
       } catch (uploadErr) {
-        console.error('Cloudinary upload error:', uploadErr.message);
+        console.error('Cloudinary upload failed:', uploadErr.message);
+        return res.status(500).json({ 
+          error: 'Image upload failed. Check Cloudinary credentials in Railway Variables.' 
+        });
       }
     }
 
-    const ageValue = (age !== null && age !== undefined && age !== '' && !isNaN(parseInt(age))) 
-      ? parseInt(age) 
-      : null;
-
     const result = await pool.query(
-      `UPDATE users SET 
-        username = COALESCE(NULLIF($1, ''), username),
-        bio = $2,
-        age = $3,
-        gender = $4,
-        profile_picture = COALESCE($5, profile_picture)
-       WHERE id = $6
-       RETURNING id, username, bio, age, gender, profile_picture, email`,
-      [username || null, bio || null, ageValue, gender || null, pictureUrl, id]
+      "INSERT INTO statuses (user_id, image, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours') RETURNING *",
+      [user_id, imageUrl]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT s.id, s.image, s.created_at, u.username, u.id as user_id
+       FROM statuses s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.expires_at > NOW()
+       AND (
+         s.user_id = $1::int
+         OR s.user_id IN (
+           SELECT CASE WHEN c.user_id = $1::int THEN c.connected_user_id ELSE c.user_id END
+           FROM connections c
+           WHERE (c.user_id = $1::int OR c.connected_user_id = $1::int)
+           AND c.status = 'accepted'
+         )
+       )
+       ORDER BY s.created_at DESC`,
+      [userId]
+    );
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

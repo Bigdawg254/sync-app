@@ -49,3 +49,4 @@ cache/
 # Credentials
 credentials.json
 private-key.json
+.aider*
