@@ -119,3 +119,16 @@ router.delete('/delete-all', async (req, res) => {
 });
 
 module.exports = router;
+// DELETE ALL DATA - for admin reset
+router.post('/reset-all', async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== 'SYNC_ADMIN_2026') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    await pool.query('TRUNCATE notifications, statuses, messages, connections, users RESTART IDENTITY CASCADE');
+    res.json({ message: 'All data cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});

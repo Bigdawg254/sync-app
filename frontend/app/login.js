@@ -1,5 +1,9 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useState, useEffect } from 'react';
+import { 
+  View, Text, TextInput, TouchableOpacity, StyleSheet, 
+  Alert, KeyboardAvoidingView, Platform, ScrollView, 
+  Dimensions, Animated
+} from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -10,11 +14,30 @@ const API = 'https://sync-app-production-2ff8.up.railway.app';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const router = useRouter();
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+    ]).start();
+
+    // Pulse animation for logo
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 2000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+
     checkBiometrics();
     loadSavedCredentials();
   }, []);
@@ -45,18 +68,25 @@ export default function LoginScreen() {
       if (savedEmail && savedPassword) {
         await doLogin(savedEmail, savedPassword);
       } else {
-        Alert.alert('Error', 'Please login with email first');
+        Alert.alert('Error', 'Please login with email first to enable biometrics');
       }
     }
   };
 
   const doLogin = async (emailVal, passwordVal) => {
+    if (!emailVal || !passwordVal) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailVal.trim().toLowerCase(), password: passwordVal })
+        body: JSON.stringify({ 
+          email: emailVal.trim().toLowerCase(), 
+          password: passwordVal 
+        })
       });
       const data = await response.json();
       if (response.ok) {
@@ -67,120 +97,163 @@ export default function LoginScreen() {
         await SecureStore.setItemAsync('userPassword', passwordVal);
         router.replace('/home');
       } else {
-        Alert.alert('Login Failed', data.error);
+        Alert.alert('Login Failed', data.error || 'Invalid credentials');
       }
     } catch (err) {
-      Alert.alert('Error', 'Cannot connect to server. Check your internet.');
+      Alert.alert('Connection Error', 'Cannot reach server. Check your internet connection.');
     }
     setLoading(false);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      {/* Animated background orbs */}
+      <View style={styles.bgOrb1} />
+      <View style={styles.bgOrb2} />
+      <View style={styles.bgOrb3} />
 
-        {/* Anime-style header */}
-        <View style={styles.heroSection}>
-          <View style={styles.orbOuter}>
-            <View style={styles.orbInner}>
-              <Text style={styles.orbText}>S</Text>
+      <KeyboardAvoidingView 
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+
+          {/* Logo Section */}
+          <Animated.View style={[styles.logoSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <Animated.View style={[styles.logoOrb, { transform: [{ scale: pulseAnim }] }]}>
+              <View style={styles.logoOrbInner}>
+                <Text style={styles.logoLetter}>S</Text>
+              </View>
+              <View style={styles.logoRing1} />
+              <View style={styles.logoRing2} />
+            </Animated.View>
+            <Text style={styles.appName}>SYNC</Text>
+            <Text style={styles.tagline}>Connect • Vibe • Belong</Text>
+          </Animated.View>
+
+          {/* Form Section */}
+          <Animated.View style={[styles.formSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <Text style={styles.welcomeText}>Welcome back</Text>
+            <Text style={styles.welcomeSub}>Sign in to continue</Text>
+
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputIcon}>✉️</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="your@email.com"
+                  placeholderTextColor="#333"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
-          </View>
-          <Text style={styles.appName}>SYNC</Text>
-          <Text style={styles.tagline}>✦ Connect Beyond Boundaries ✦</Text>
-        </View>
 
-        {/* Form */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Welcome Back</Text>
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>PASSWORD</Text>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputIcon}>🔒</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#333"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>EMAIL</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="your@email.com"
-              placeholderTextColor="#444"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>PASSWORD</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor="#444"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
-            onPress={() => doLogin(email, password)}
-            disabled={loading}>
-            <Text style={styles.loginBtnText}>
-              {loading ? 'CONNECTING...' : 'LOGIN →'}
-            </Text>
-          </TouchableOpacity>
-
-          {biometricAvailable && (
-            <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
-              <Text style={styles.biometricText}>🔐  Use Fingerprint</Text>
+            <TouchableOpacity onPress={() => router.push('/reset-password')} style={styles.forgotContainer}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
-          )}
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
+            {/* Login Button */}
+            <TouchableOpacity
+              style={[styles.loginBtn, loading && styles.loginBtnLoading]}
+              onPress={() => doLogin(email, password)}
+              disabled={loading}
+              activeOpacity={0.85}>
+              <Text style={styles.loginBtnText}>
+                {loading ? '⏳  Signing in...' : 'SIGN IN  →'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.signupBtn} onPress={() => router.push('/signup')}>
-            <Text style={styles.signupBtnText}>CREATE ACCOUNT</Text>
-          </TouchableOpacity>
+            {/* Biometric */}
+            {biometricAvailable && (
+              <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin} activeOpacity={0.8}>
+                <Text style={styles.biometricIcon}>🔐</Text>
+                <Text style={styles.biometricText}>Sign in with Fingerprint</Text>
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity onPress={() => router.push('/reset-password')}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>NEW TO SYNC?</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Sign Up Button */}
+            <TouchableOpacity
+              style={styles.signupBtn}
+              onPress={() => router.push('/signup')}
+              activeOpacity={0.85}>
+              <Text style={styles.signupBtnText}>CREATE FREE ACCOUNT</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050508' },
-  scrollContent: { flexGrow: 1, paddingBottom: 40 },
-  heroSection: { alignItems: 'center', paddingTop: height * 0.08, paddingBottom: 30 },
-  orbOuter: { width: 110, height: 110, borderRadius: 55, borderWidth: 2, borderColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginBottom: 20, shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 20, elevation: 20 },
-  orbInner: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  orbText: { fontSize: 44, fontWeight: 'bold', color: '#fff' },
-  appName: { fontSize: 42, fontWeight: 'bold', color: '#fff', letterSpacing: 12 },
-  tagline: { color: '#6c63ff', fontSize: 13, marginTop: 8, letterSpacing: 2 },
-  formCard: { marginHorizontal: 20, backgroundColor: '#0d0d14', borderRadius: 24, padding: 28, borderWidth: 1, borderColor: '#1a1a2e' },
-  formTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  inputWrapper: { marginBottom: 20 },
-  inputLabel: { color: '#6c63ff', fontSize: 11, fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
-  input: { backgroundColor: '#111120', color: '#fff', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#1e1e3a' },
-  loginBtn: { backgroundColor: '#6c63ff', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  loginBtnDisabled: { backgroundColor: '#3a3760' },
+  container: { flex: 1, backgroundColor: '#020208' },
+  flex: { flex: 1 },
+  bgOrb1: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(108,99,255,0.12)', top: -80, left: -80 },
+  bgOrb2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(108,99,255,0.08)', top: height * 0.3, right: -60 },
+  bgOrb3: { position: 'absolute', width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(108,99,255,0.06)', bottom: 100, left: 20 },
+  scrollContent: { flexGrow: 1, paddingBottom: 48 },
+  logoSection: { alignItems: 'center', paddingTop: height * 0.1, paddingBottom: 40 },
+  logoOrb: { width: 120, height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 24, position: 'relative' },
+  logoOrbInner: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 30, elevation: 20 },
+  logoLetter: { fontSize: 52, fontWeight: 'bold', color: '#fff' },
+  logoRing1: { position: 'absolute', width: 112, height: 112, borderRadius: 56, borderWidth: 1.5, borderColor: 'rgba(108,99,255,0.4)' },
+  logoRing2: { position: 'absolute', width: 128, height: 128, borderRadius: 64, borderWidth: 1, borderColor: 'rgba(108,99,255,0.15)' },
+  appName: { fontSize: 44, fontWeight: 'bold', color: '#fff', letterSpacing: 14, marginBottom: 8 },
+  tagline: { color: '#6c63ff', fontSize: 13, letterSpacing: 3, fontWeight: '500' },
+  formSection: { paddingHorizontal: 24 },
+  welcomeText: { color: '#fff', fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
+  welcomeSub: { color: '#444', fontSize: 15, marginBottom: 32 },
+  inputGroup: { marginBottom: 20 },
+  inputLabel: { color: '#6c63ff', fontSize: 10, fontWeight: 'bold', letterSpacing: 3, marginBottom: 10 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d0d18', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a2e', paddingHorizontal: 16 },
+  inputIcon: { fontSize: 18, marginRight: 12 },
+  input: { flex: 1, color: '#fff', fontSize: 15, paddingVertical: 16 },
+  eyeBtn: { padding: 8 },
+  eyeIcon: { fontSize: 18 },
+  forgotContainer: { alignItems: 'flex-end', marginBottom: 28, marginTop: -8 },
+  forgotText: { color: '#6c63ff', fontSize: 13 },
+  loginBtn: { backgroundColor: '#6c63ff', paddingVertical: 18, borderRadius: 14, alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
+  loginBtnLoading: { backgroundColor: '#3a3760', shadowOpacity: 0 },
   loginBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 },
-  biometricBtn: { backgroundColor: '#111120', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: '#6c63ff' },
-  biometricText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 15 },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#1e1e3a' },
-  dividerText: { color: '#444', marginHorizontal: 12, fontSize: 12 },
-  signupBtn: { backgroundColor: 'transparent', padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#6c63ff' },
-  signupBtnText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 },
-  forgotText: { color: '#444', textAlign: 'center', marginTop: 20, fontSize: 14 },
+  biometricBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#0d0d18', paddingVertical: 16, borderRadius: 14, marginTop: 14, borderWidth: 1, borderColor: '#6c63ff' },
+  biometricIcon: { fontSize: 20 },
+  biometricText: { color: '#6c63ff', fontWeight: '600', fontSize: 15 },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 28 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#111120' },
+  dividerText: { color: '#333', marginHorizontal: 14, fontSize: 11, letterSpacing: 2 },
+  signupBtn: { borderWidth: 1.5, borderColor: '#6c63ff', paddingVertical: 18, borderRadius: 14, alignItems: 'center' },
+  signupBtnText: { color: '#6c63ff', fontWeight: 'bold', fontSize: 15, letterSpacing: 2 },
 });
