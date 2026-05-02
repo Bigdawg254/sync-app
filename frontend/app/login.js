@@ -51,23 +51,10 @@ export default function LoginScreen() {
     } catch {}
   };
 
- // Save credentials - works on both web and mobile
-const saveCredentials = async (token, userId, username, email, password) => {
-  try {
-    await SecureStore.setItemAsync('userToken', token);
-    await SecureStore.setItemAsync('userId', userId);
-    await SecureStore.setItemAsync('username', username);
-    await SecureStore.setItemAsync('userEmail', email);
-    await SecureStore.setItemAsync('userPassword', password);
-  } catch {
-    // Web fallback
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('userToken', token);
-      localStorage.setItem('userId', userId);
-      localStorage.setItem('username', username);
-    }
-  }
-};
+  const doLogin = async (e, p) => {
+    if (!e || !p) { Alert.alert('Error', 'Please fill in all fields'); return; }
+    setLoading(true);
+    try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
