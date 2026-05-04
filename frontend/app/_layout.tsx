@@ -1,8 +1,9 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
 export default function Layout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, animation: Platform.OS === 'ios' ? 'default' : 'fade' }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />

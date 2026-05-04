@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -32,11 +32,11 @@ export default function SignupScreen() {
       });
       const data = await response.json();
       if (response.ok) {
-        await SecureStore.setItemAsync('userToken', data.token);
-        await SecureStore.setItemAsync('userId', data.user.id.toString());
-        await SecureStore.setItemAsync('username', data.user.username);
-        await SecureStore.setItemAsync('userEmail', email.trim().toLowerCase());
-        await SecureStore.setItemAsync('userPassword', password);
+        await storage.set('userToken', data.token);
+        await storage.set('userId', data.user.id.toString());
+        await storage.set('username', data.user.username);
+        await storage.set('userEmail', email.trim().toLowerCase());
+        await storage.set('userPassword', password);
         router.replace('/home');
       } else {
         Alert.alert('Error', data.error);

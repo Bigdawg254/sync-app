@@ -2,7 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, Activ
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -12,130 +12,149 @@ export default function StatusScreen() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(null);
+  const [myUserId, setMyUserId] = useState(null);
 
-  useEffect(() => {
-    loadStatuses();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const loadStatuses = async () => {
+  const loadData = async () => {
+    const id = await storage.get('userId');
+    setMyUserId(id);
+    await loadStatuses(id);
+  };
+
+  const loadStatuses = async (id) => {
     setLoading(true);
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${API}/api/status/${userId}`, {
+      const token = await storage.get('userToken');
+      const res = await fetch(`${API}/api/status/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
+      const data = await res.json();
       setStatuses(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.log(err);
-    }
+    } catch {}
     setLoading(false);
   };
 
   const addStatus = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow access to your photos');
-      return;
-    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 0.5,
-      base64: true
+      allowsEditing: true, aspect: [9, 16], quality: 0.6, base64: true
     });
     if (!result.canceled) {
       setPosting(true);
       try {
-        const userId = await SecureStore.getItemAsync('userId');
-        const token = await SecureStore.getItemAsync('userToken');
-        const response = await fetch(`${API}/api/status`, {
+        const token = await storage.get('userToken');
+        const userId = await storage.get('userId');
+        const res = await fetch(`${API}/api/status`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            image: `data:image/jpeg;base64,${result.assets[0].base64}`
-          })
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ user_id: userId, image: `data:image/jpeg;base64,${result.assets[0].base64}` })
         });
-        const data = await response.json();
-        if (response.ok) {
-          Alert.alert('Success', 'Status posted!');
-          loadStatuses();
+        const data = await res.json();
+        if (res.ok) {
+          Alert.alert('✅ Status posted!');
+          await loadStatuses(userId);
         } else {
-          Alert.alert('Error', data.error || 'Could not post status');
+          Alert.alert('Error', data.error || 'Upload failed');
         }
-      } catch (err) {
-        Alert.alert('Error', 'Cannot connect to server');
-      }
+      } catch { Alert.alert('Error', 'Cannot connect'); }
       setPosting(false);
     }
+  };
+
+  const deleteStatus = async (statusId) => {
+    Alert.alert('Delete Status', 'Remove this status update?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          const token = await storage.get('userToken');
+          const res = await fetch(`${API}/api/status/${statusId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            setSelectedStatus(null);
+            const userId = await storage.get('userId');
+            await loadStatuses(userId);
+          }
+        } catch {}
+      }}
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/home')}>
-          <Text style={styles.back}>← Back</Text>
+        <TouchableOpacity onPress={() => router.replace('/home')} style={styles.backBtn}>
+          <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Status</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <TouchableOpacity style={styles.myStatusRow} onPress={addStatus} disabled={posting}>
-        <View style={styles.addAvatar}>
-          <Text style={styles.addAvatarText}>{posting ? '⏳' : '+'}</Text>
+      <TouchableOpacity style={styles.myRow} onPress={addStatus} disabled={posting} activeOpacity={0.8}>
+        <View style={styles.myAvatar}>
+          <Text style={styles.myAvatarText}>{posting ? '⏳' : '+'}</Text>
         </View>
         <View>
-          <Text style={styles.myStatusTitle}>My Status</Text>
-          <Text style={styles.myStatusSubtitle}>{posting ? 'Uploading...' : 'Tap to add status update'}</Text>
+          <Text style={styles.myTitle}>My Status</Text>
+          <Text style={styles.mySub}>{posting ? 'Uploading...' : 'Tap to add a status update'}</Text>
         </View>
       </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>RECENT UPDATES</Text>
+      <Text style={styles.sectionLabel}>RECENT UPDATES</Text>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6c63ff" />
-        </View>
+        <View style={styles.center}><ActivityIndicator color="#6c63ff" size="large" /></View>
       ) : statuses.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No status updates</Text>
-          <Text style={styles.emptySubText}>Add friends to see their status updates!</Text>
+          <Text style={styles.emptyIcon}>⭕</Text>
+          <Text style={styles.emptyTitle}>No Updates</Text>
+          <Text style={styles.emptySub}>Add friends to see their status updates here</Text>
         </View>
       ) : (
         <FlatList
           data={statuses}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.statusRow} onPress={() => setSelectedStatus(item)}>
-              <View style={styles.statusAvatarRing}>
-                <Image source={{ uri: item.image }} style={styles.statusAvatar} />
+            <TouchableOpacity style={styles.statusRow} onPress={() => setSelectedStatus(item)} activeOpacity={0.8}>
+              <View style={styles.statusRing}>
+                <Image source={{ uri: item.image }} style={styles.statusThumb} />
               </View>
-              <View>
-                <Text style={styles.statusUsername}>{item.username}</Text>
-                <Text style={styles.statusTime}>{new Date(item.created_at).toLocaleTimeString()}</Text>
+              <View style={styles.statusInfo}>
+                <Text style={styles.statusName}>{item.username}</Text>
+                <Text style={styles.statusTime}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
+              {item.user_id?.toString() === myUserId && (
+                <TouchableOpacity onPress={() => deleteStatus(item.id)} style={styles.deleteBtn}>
+                  <Text style={styles.deleteBtnText}>🗑️</Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
           )}
         />
       )}
 
-      {/* Full screen status viewer */}
-      <Modal visible={!!selectedStatus} transparent animationType="fade">
-        <View style={styles.modalContainer}>
-          <TouchableOpacity style={styles.modalClose} onPress={() => setSelectedStatus(null)}>
-            <Text style={styles.modalCloseText}>✕</Text>
-          </TouchableOpacity>
-          {selectedStatus && (
-            <Image source={{ uri: selectedStatus.image }} style={styles.fullImage} resizeMode="contain" />
-          )}
-          {selectedStatus && (
-            <Text style={styles.modalUsername}>{selectedStatus.username}</Text>
-          )}
+      {/* Full screen viewer */}
+      <Modal visible={!!selectedStatus} transparent animationType="fade" onRequestClose={() => setSelectedStatus(null)}>
+        <View style={styles.modal}>
+          <View style={styles.modalTop}>
+            <Text style={styles.modalName}>{selectedStatus?.username}</Text>
+            <Text style={styles.modalTime}>{selectedStatus && new Date(selectedStatus.created_at).toLocaleTimeString()}</Text>
+          </View>
+          {selectedStatus && <Image source={{ uri: selectedStatus.image }} style={styles.modalImage} resizeMode="contain" />}
+          <View style={styles.modalBottom}>
+            {selectedStatus?.user_id?.toString() === myUserId && (
+              <TouchableOpacity style={styles.modalDelete} onPress={() => deleteStatus(selectedStatus.id)} activeOpacity={0.8}>
+                <Text style={styles.modalDeleteText}>🗑️  Delete Status</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.modalClose} onPress={() => setSelectedStatus(null)} activeOpacity={0.8}>
+              <Text style={styles.modalCloseText}>✕  Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -143,27 +162,37 @@ export default function StatusScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 50, backgroundColor: '#1a1a2e', gap: 16 },
-  back: { color: '#6c63ff', fontSize: 16 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
-  myStatusRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e1e1e', gap: 12 },
-  addAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  addAvatarText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  myStatusTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  myStatusSubtitle: { color: '#888', fontSize: 13, marginTop: 2 },
-  sectionTitle: { color: '#555', fontSize: 12, padding: 16, paddingBottom: 8, letterSpacing: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  emptySubText: { color: '#555', fontSize: 13, marginTop: 8, textAlign: 'center' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1e1e1e', gap: 12 },
-  statusAvatarRing: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
-  statusAvatar: { width: 50, height: 50, borderRadius: 25 },
-  statusUsername: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  statusTime: { color: '#888', fontSize: 13, marginTop: 2 },
-  modalContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
-  modalCloseText: { color: '#fff', fontSize: 24 },
-  fullImage: { width: '100%', height: '80%' },
-  modalUsername: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 16 },
+  container: { flex: 1, backgroundColor: '#02020a' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: Platform.OS === 'ios' ? 54 : 44, paddingBottom: 12, backgroundColor: '#0d0d18', borderBottomWidth: 1, borderBottomColor: '#111125' },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  backText: { color: '#6c63ff', fontSize: 24 },
+  headerTitle: { flex: 1, color: '#fff', fontWeight: 'bold', fontSize: 18, textAlign: 'center' },
+  myRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#06060f', gap: 14 },
+  myAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#8a83ff' },
+  myAvatarText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
+  myTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  mySub: { color: '#444', fontSize: 13, marginTop: 2 },
+  sectionLabel: { color: '#333', fontSize: 11, letterSpacing: 2, paddingHorizontal: 16, paddingVertical: 12 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#06060f' },
+  statusRing: { width: 58, height: 58, borderRadius: 29, borderWidth: 2.5, borderColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', padding: 2 },
+  statusThumb: { width: 50, height: 50, borderRadius: 25 },
+  statusInfo: { flex: 1, marginLeft: 14 },
+  statusName: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  statusTime: { color: '#444', fontSize: 13, marginTop: 3 },
+  deleteBtn: { padding: 8 },
+  deleteBtnText: { fontSize: 20 },
+  emptyIcon: { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
+  emptySub: { color: '#444', fontSize: 14, textAlign: 'center' },
+  modal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'space-between' },
+  modalTop: { paddingTop: 60, paddingHorizontal: 20 },
+  modalName: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  modalTime: { color: '#666', fontSize: 13, marginTop: 4 },
+  modalImage: { width: '100%', height: '70%' },
+  modalBottom: { paddingHorizontal: 20, paddingBottom: 50, gap: 12 },
+  modalDelete: { backgroundColor: '#1a0a0a', paddingVertical: 16, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#ff4d4d' },
+  modalDeleteText: { color: '#ff4d4d', fontWeight: 'bold', fontSize: 15 },
+  modalClose: { backgroundColor: '#111120', paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  modalCloseText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });

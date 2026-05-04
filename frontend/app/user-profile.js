@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -17,7 +17,7 @@ export default function UserProfileScreen() {
 
   const loadUser = async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -1,7 +1,7 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -17,8 +17,8 @@ export default function FindFriendsScreen() {
 
   const fetchUsers = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -34,8 +34,8 @@ export default function FindFriendsScreen() {
   const sendRequest = async (receiverId) => {
     setRequesting(prev => ({ ...prev, [receiverId]: true }));
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/connections/request`, {
         method: 'POST',
         headers: {

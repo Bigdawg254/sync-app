@@ -1,7 +1,7 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -19,8 +19,8 @@ export default function RequestsScreen() {
 
   const fetchRequests = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/connections/requests/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -34,8 +34,8 @@ export default function RequestsScreen() {
 
   const fetchNotifications = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/connections/notifications/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -54,7 +54,7 @@ export default function RequestsScreen() {
 
   const acceptRequest = async (connectionId) => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/connections/accept`, {
         method: 'POST',
         headers: {

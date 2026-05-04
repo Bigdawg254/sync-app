@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -19,8 +19,8 @@ export default function EditProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -37,8 +37,8 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
 
       if (!token) {
         Alert.alert('Error', 'Please login again');

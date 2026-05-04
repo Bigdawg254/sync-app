@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Keyboard
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { io } from 'socket.io-client';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -24,8 +24,8 @@ export default function ChatScreen() {
   }, []);
 
   const initChat = async () => {
-    const id = await SecureStore.getItemAsync('userId');
-    const token = await SecureStore.getItemAsync('userToken');
+    const id = await storage.get('userId');
+    const token = await storage.get('userToken');
     setUserId(id);
 
     try {
@@ -67,7 +67,7 @@ export default function ChatScreen() {
 
   const sendMessage = async () => {
     if (!message.trim() || !userId) return;
-    const token = await SecureStore.getItemAsync('userToken');
+    const token = await storage.get('userToken');
     const msgText = message.trim();
     setMessage('');
 

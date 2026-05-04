@@ -1,7 +1,7 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Dimensions, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const { width, height } = Dimensions.get('window');
 const API = 'https://sync-app-production-2ff8.up.railway.app';
@@ -39,8 +39,8 @@ export default function HomeScreen() {
 
   const loadFriends = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const res = await fetch(`${API}/api/connections/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -52,8 +52,8 @@ export default function HomeScreen() {
 
   const loadNotifs = async () => {
     try {
-      const userId = await SecureStore.getItemAsync('userId');
-      const token = await SecureStore.getItemAsync('userToken');
+      const userId = await storage.get('userId');
+      const token = await storage.get('userToken');
       const res = await fetch(`${API}/api/connections/notifications/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

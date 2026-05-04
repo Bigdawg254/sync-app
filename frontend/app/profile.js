@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } fr
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -19,8 +19,8 @@ export default function ProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      const userId = await SecureStore.getItemAsync('userId');
+      const token = await storage.get('userToken');
+      const userId = await storage.get('userId');
       const response = await fetch(`${API}/api/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -55,8 +55,8 @@ export default function ProfileScreen() {
     if (!imageBase64) return;
     setSaving(true);
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      const userId = await SecureStore.getItemAsync('userId');
+      const token = await storage.get('userToken');
+      const userId = await storage.get('userId');
       const response = await fetch(`${API}/api/users/${userId}`, {
         method: 'PUT',
         headers: {
@@ -97,16 +97,16 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const userId = await SecureStore.getItemAsync('userId');
+              const userId = await storage.get('userId');
               const response = await fetch(`${API}/api/auth/delete/${userId}`, {
                 method: 'DELETE'
               });
               if (response.ok) {
-                await SecureStore.deleteItemAsync('userToken');
-                await SecureStore.deleteItemAsync('userId');
-                await SecureStore.deleteItemAsync('userEmail');
-                await SecureStore.deleteItemAsync('userPassword');
-                await SecureStore.deleteItemAsync('username');
+                await storage.del('userToken');
+                await storage.del('userId');
+                await storage.del('userEmail');
+                await storage.del('userPassword');
+                await storage.del('username');
                 router.replace('/login');
               } else {
                 Alert.alert('Error', 'Could not delete account');
@@ -121,11 +121,11 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    await SecureStore.deleteItemAsync('userToken');
-    await SecureStore.deleteItemAsync('userId');
-    await SecureStore.deleteItemAsync('userEmail');
-    await SecureStore.deleteItemAsync('userPassword');
-    await SecureStore.deleteItemAsync('username');
+    await storage.del('userToken');
+    await storage.del('userId');
+    await storage.del('userEmail');
+    await storage.del('userPassword');
+    await storage.del('username');
     router.replace('/login');
   };
 

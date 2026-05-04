@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Activity
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { io } from 'socket.io-client';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './login';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
@@ -24,7 +24,7 @@ export default function RandomMatchScreen() {
   }, []);
 
   const initSocket = async () => {
-    const id = await SecureStore.getItemAsync('userId');
+    const id = await storage.get('userId');
     setUserId(id);
     socketRef.current = io(API, { transports: ['websocket'] });
     socketRef.current.on('matched', (data) => {
@@ -60,7 +60,7 @@ export default function RandomMatchScreen() {
 
   const addFriend = async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
+      const token = await storage.get('userToken');
       const response = await fetch(`${API}/api/connections/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -217,4 +217,4 @@ const styles = StyleSheet.create({
   sendBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#1a1a2e' },
   sendBtnText: { color: '#fff', fontSize: 20 },
-});
+})
