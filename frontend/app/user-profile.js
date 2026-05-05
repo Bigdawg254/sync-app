@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { storage } from './login';
+import { storage } from './storage';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 

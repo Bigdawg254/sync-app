@@ -2,28 +2,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvo
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { storage } from './login';
+import { storage } from './storage';
 
 const { width, height } = Dimensions.get('window');
 const API = 'https://sync-app-production-2ff8.up.railway.app';
-
-// Storage helper that works on web AND mobile
-const storage = {
-  set: async (key, value) => {
-    try { await storage.set(key, value); } 
-    catch { if (typeof localStorage !== 'undefined') localStorage.setItem(key, value); }
-  },
-  get: async (key) => {
-    try { return await storage.get(key); }
-    catch { return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null; }
-  },
-  del: async (key) => {
-    try { await storage.del(key); }
-    catch { if (typeof localStorage !== 'undefined') localStorage.removeItem(key); }
-  }
-};
-
-export { storage };
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -54,26 +36,17 @@ export default function LoginScreen() {
 
   const init = async () => {
     try {
-      // Check if already logged in
       const token = await storage.get('userToken');
-      if (token) {
-        router.replace('/home');
-        return;
-      }
-
-      // Load saved credentials
+      if (token) { router.replace('/home'); return; }
       const savedEmail = await storage.get('userEmail');
       const savedPassword = await storage.get('userPassword');
       if (savedEmail) setEmail(savedEmail);
       if (savedPassword) setPassword(savedPassword);
-
-      // Check biometrics
       const compat = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (compat && enrolled && savedEmail && savedPassword) {
         setBiometricAvailable(true);
-        // Auto-prompt biometric if credentials saved
-        setTimeout(() => triggerBiometric(savedEmail, savedPassword), 500);
+        setTimeout(() => triggerBiometric(savedEmail, savedPassword), 600);
       }
     } catch {}
     setCheckingAuto(false);
@@ -126,10 +99,8 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Logo */}
           <Animated.View style={[styles.logoSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <Animated.View style={[styles.logoContainer, { transform: [{ scale: pulseAnim }] }]}>
-              {/* Instagram/WhatsApp style gradient logo */}
               <View style={styles.logoGradient}>
                 <View style={styles.logoInnerRing}>
                   <Text style={styles.logoLetter}>S</Text>
@@ -137,7 +108,6 @@ export default function LoginScreen() {
               </View>
               <View style={styles.logoRing1} />
               <View style={styles.logoRing2} />
-              {/* Decorative dots */}
               <View style={[styles.logoDot, { top: 8, right: 16 }]} />
               <View style={[styles.logoDot, styles.logoDotSmall, { bottom: 12, left: 20 }]} />
               <View style={[styles.logoDot, styles.logoDotTiny, { top: 20, left: 12 }]} />
@@ -146,7 +116,6 @@ export default function LoginScreen() {
             <Text style={styles.tagline}>connect  ·  vibe  ·  belong</Text>
           </Animated.View>
 
-          {/* Form */}
           <Animated.View style={[styles.formCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <Text style={styles.welcomeTitle}>Welcome back 👋</Text>
             <Text style={styles.welcomeSub}>Sign in to continue</Text>

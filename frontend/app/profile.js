@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } fr
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { storage } from './login';
+import { storage } from './storage';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 

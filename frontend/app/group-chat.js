@@ -2,7 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Keyboard
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { io } from 'socket.io-client';
-import { storage } from './login';
+import { storage } from './storage';
 
 const API = 'https://sync-app-production-2ff8.up.railway.app';
 
