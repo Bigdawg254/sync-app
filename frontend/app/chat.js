@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, StatusBar, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { io } from 'socket.io-client';
@@ -12,33 +12,39 @@ export default function ChatScreen() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [userId, setUserId] = useState(null);
-  const [connected, setConnected] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const socketRef = useRef(null);
   const flatListRef = useRef(null);
   const roomRef = useRef(null);
-  const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     initChat();
-    return () => { if (socketRef.current) socketRef.current.disconnect(); };
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
   }, []);
 
   const initChat = async () => {
     const id = await storage.get('userId');
     const token = await storage.get('userToken');
+    const uname = await storage.get('username');
     setUserId(id);
 
     try {
-      const response = await fetch(`${API}/api/messages/${friendId}?senderId=${id}`, {
+      const res = await fetch(`${API}/api/messages/${friendId}?senderId=${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
+      const data = await res.json();
       if (Array.isArray(data)) {
         setMessages(data.map(msg => ({
           id: msg.id.toString(),
           text: msg.content,
           sender: msg.sender_id.toString() === id ? 'me' : 'them',
-          time: new Date(msg.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date(msg.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          read: msg.is_read
         })));
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 300);
       }
@@ -46,23 +52,61 @@ export default function ChatScreen() {
 
     const room = [id, friendId].sort().join('_');
     roomRef.current = room;
+
     socketRef.current = io(API, { transports: ['websocket'], reconnection: true });
+
     socketRef.current.on('connect', () => {
-      setConnected(true);
+      socketRef.current.emit('user_online', id);
       socketRef.current.emit('join_room', room);
+      socketRef.current.emit('check_online_status', [friendId]);
     });
+
+    socketRef.current.on('online_statuses', (statuses) => {
+      setIsOnline(!!statuses[friendId]);
+    });
+
+    socketRef.current.on('user_status_change', ({ userId: uid, online }) => {
+      if (uid.toString() === friendId.toString()) {
+        setIsOnline(online);
+      }
+    });
+
+    socketRef.current.on('user_typing', ({ userId: uid }) => {
+      if (uid.toString() === friendId.toString()) {
+        setIsTyping(true);
+      }
+    });
+
+    socketRef.current.on('user_stopped_typing', ({ userId: uid }) => {
+      if (uid.toString() === friendId.toString()) {
+        setIsTyping(false);
+      }
+    });
+
     socketRef.current.on('receive_message', (data) => {
       if (data.sender_id && data.sender_id.toString() !== id) {
+        setIsTyping(false);
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           text: data.text,
           sender: 'them',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          read: false
         }]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       }
     });
-    socketRef.current.on('disconnect', () => setConnected(false));
+  };
+
+  const handleTyping = (text) => {
+    setMessage(text);
+    if (socketRef.current && roomRef.current && userId) {
+      socketRef.current.emit('typing_start', { room: roomRef.current, userId, username: '' });
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current.emit('typing_stop', { room: roomRef.current, userId });
+      }, 1500);
+    }
   };
 
   const sendMessage = async () => {
@@ -71,11 +115,16 @@ export default function ChatScreen() {
     const msgText = message.trim();
     setMessage('');
 
+    if (socketRef.current) {
+      socketRef.current.emit('typing_stop', { room: roomRef.current, userId });
+    }
+
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       text: msgText,
       sender: 'me',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      read: false
     }]);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
@@ -92,11 +141,22 @@ export default function ChatScreen() {
     }
   };
 
+  const startCall = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('call_user', {
+        targetUserId: friendId,
+        callerId: userId,
+        callerName: 'You',
+        callType: 'voice'
+      });
+    }
+    router.push({ pathname: '/call', params: { friendId, friendName, isOutgoing: 'true' } });
+  };
+
   const renderMessage = ({ item, index }) => {
     const isMe = item.sender === 'me';
     const prevMsg = messages[index - 1];
     const showAvatar = !isMe && (!prevMsg || prevMsg.sender !== 'them');
-
     return (
       <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}>
         {!isMe && (
@@ -105,12 +165,11 @@ export default function ChatScreen() {
           </View>
         )}
         <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-            {item.text}
-          </Text>
-          <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeThem]}>
-            {item.time} {isMe && '✓✓'}
-          </Text>
+          <Text style={styles.bubbleText}>{item.text}</Text>
+          <View style={styles.bubbleMeta}>
+            <Text style={styles.bubbleTime}>{item.time}</Text>
+            {isMe && <Text style={styles.readTick}>{item.read ? '✓✓' : '✓'}</Text>}
+          </View>
         </View>
       </View>
     );
@@ -118,13 +177,8 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0d0d18" />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}>
-
-        {/* Premium Header */}
+      <StatusBar barStyle="light-content" backgroundColor="#0a0a14" />
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.replace('/home')} style={styles.backBtn} activeOpacity={0.7}>
             <Text style={styles.backIcon}>‹</Text>
@@ -137,26 +191,33 @@ export default function ChatScreen() {
               <View style={styles.headerAvatar}>
                 <Text style={styles.headerAvatarText}>{friendName ? friendName[0].toUpperCase() : '?'}</Text>
               </View>
-              {connected && <View style={styles.onlineDot} />}
+              <View style={[styles.onlineDot, { backgroundColor: isOnline ? '#00e676' : '#555' }]} />
             </View>
             <View>
               <Text style={styles.headerName}>{friendName || 'Chat'}</Text>
-              <Text style={styles.headerStatus}>{connected ? 'Online' : 'Connecting...'}</Text>
+              {isTyping ? (
+                <Text style={styles.typingText}>typing...</Text>
+              ) : (
+                <Text style={[styles.headerStatus, { color: isOnline ? '#00e676' : '#555' }]}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </Text>
+              )}
             </View>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.callBtn}
-            onPress={() => router.push({ pathname: '/call', params: { friendId, friendName } })}
-            activeOpacity={0.7}>
-            <Text style={styles.callIcon}>📞</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={startCall} activeOpacity={0.7}>
+              <Text style={styles.headerActionIcon}>📞</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={() => router.push({ pathname: '/call', params: { friendId, friendName, isVideo: 'true' } })} activeOpacity={0.7}>
+              <Text style={styles.headerActionIcon}>📹</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Messages */}
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
@@ -165,22 +226,29 @@ export default function ChatScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>👋</Text>
-              <Text style={styles.emptyTitle}>Say hello!</Text>
-              <Text style={styles.emptySub}>Start your conversation with {friendName}</Text>
+              <Text style={styles.emptyText}>Say hello to {friendName}!</Text>
             </View>
           }
         />
 
-        {/* Premium Input Bar */}
+        {isTyping && (
+          <View style={styles.typingBubble}>
+            <View style={styles.typingDots}>
+              <View style={[styles.typingDot, styles.typingDot1]} />
+              <View style={[styles.typingDot, styles.typingDot2]} />
+              <View style={[styles.typingDot, styles.typingDot3]} />
+            </View>
+          </View>
+        )}
+
         <View style={styles.inputBar}>
           <View style={styles.inputWrap}>
             <TextInput
-              ref={inputRef}
               style={styles.input}
               placeholder="Message..."
-              placeholderTextColor="#333"
+              placeholderTextColor="#2a2a3a"
               value={message}
-              onChangeText={setMessage}
+              onChangeText={handleTyping}
               multiline
               maxLength={1000}
             />
@@ -199,44 +267,49 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  outerContainer: { flex: 1, backgroundColor: '#08080f' },
+  outerContainer: { flex: 1, backgroundColor: '#02020a' },
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: Platform.OS === 'ios' ? 52 : 44, paddingBottom: 12, backgroundColor: '#0d0d18', borderBottomWidth: 1, borderBottomColor: '#111125' },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  backIcon: { color: '#6c63ff', fontSize: 34, fontWeight: '300', marginTop: -4 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingTop: Platform.OS === 'ios' ? 52 : 40, paddingBottom: 10, backgroundColor: '#0a0a14', borderBottomWidth: 1, borderBottomColor: '#0f0f1e' },
+  backBtn: { width: 40, height: 44, justifyContent: 'center', alignItems: 'center' },
+  backIcon: { color: '#6c63ff', fontSize: 36, fontWeight: '200', marginTop: -4 },
   headerProfile: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatarWrap: { position: 'relative' },
   headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center' },
   headerAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#00e676', borderWidth: 2, borderColor: '#0d0d18' },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#0a0a14' },
   headerName: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  headerStatus: { color: '#00e676', fontSize: 11, marginTop: 1 },
-  callBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#111125', justifyContent: 'center', alignItems: 'center' },
-  callIcon: { fontSize: 18 },
-  messagesList: { paddingHorizontal: 12, paddingVertical: 16, paddingBottom: 8, flexGrow: 1 },
+  headerStatus: { fontSize: 12, marginTop: 1 },
+  typingText: { color: '#6c63ff', fontSize: 12, marginTop: 1, fontStyle: 'italic' },
+  headerActions: { flexDirection: 'row', gap: 4 },
+  headerActionBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0f0f1e', justifyContent: 'center', alignItems: 'center' },
+  headerActionIcon: { fontSize: 18 },
+  messagesList: { paddingHorizontal: 12, paddingVertical: 16, flexGrow: 1 },
   msgRow: { flexDirection: 'row', marginBottom: 4, alignItems: 'flex-end' },
   msgRowMe: { justifyContent: 'flex-end' },
   msgRowThem: { justifyContent: 'flex-start' },
-  msgAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginRight: 6, marginBottom: 2 },
+  msgAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', marginRight: 6 },
   msgAvatarText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  bubble: { maxWidth: '75%', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderRadius: 20 },
+  bubble: { maxWidth: '76%', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderRadius: 20 },
   bubbleMe: { backgroundColor: '#6c63ff', borderBottomRightRadius: 5, marginLeft: 40 },
-  bubbleThem: { backgroundColor: '#141428', borderBottomLeftRadius: 5, borderWidth: 1, borderColor: '#1e1e3a' },
-  bubbleText: { fontSize: 15.5, lineHeight: 22 },
-  bubbleTextMe: { color: '#fff' },
-  bubbleTextThem: { color: '#e8e8f0' },
-  bubbleTime: { fontSize: 10, marginTop: 3, textAlign: 'right' },
-  bubbleTimeMe: { color: 'rgba(255,255,255,0.45)' },
-  bubbleTimeThem: { color: 'rgba(200,200,220,0.4)' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyEmoji: { fontSize: 52, marginBottom: 16 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  emptySub: { color: '#333', fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 12, backgroundColor: '#0d0d18', borderTopWidth: 1, borderTopColor: '#111125', gap: 8 },
-  inputWrap: { flex: 1, backgroundColor: '#111125', borderRadius: 24, borderWidth: 1, borderColor: '#1e1e3a', paddingHorizontal: 16, paddingVertical: 4, minHeight: 48, justifyContent: 'center' },
+  bubbleThem: { backgroundColor: '#0f0f1e', borderBottomLeftRadius: 5, borderWidth: 1, borderColor: '#1a1a2e' },
+  bubbleText: { color: '#fff', fontSize: 15.5, lineHeight: 22 },
+  bubbleMeta: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 3 },
+  bubbleTime: { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
+  readTick: { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  emptyEmoji: { fontSize: 52, marginBottom: 12 },
+  emptyText: { color: '#333', fontSize: 16 },
+  typingBubble: { paddingHorizontal: 16, paddingVertical: 8 },
+  typingDots: { flexDirection: 'row', backgroundColor: '#0f0f1e', padding: 12, borderRadius: 20, borderBottomLeftRadius: 5, alignSelf: 'flex-start', gap: 4, borderWidth: 1, borderColor: '#1a1a2e' },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6c63ff' },
+  typingDot1: { opacity: 0.4 },
+  typingDot2: { opacity: 0.7 },
+  typingDot3: { opacity: 1 },
+  inputBar: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 12, backgroundColor: '#0a0a14', borderTopWidth: 1, borderTopColor: '#0f0f1e', alignItems: 'flex-end', gap: 8 },
+  inputWrap: { flex: 1, backgroundColor: '#0f0f1e', borderRadius: 24, borderWidth: 1, borderColor: '#1a1a2e', paddingHorizontal: 16, paddingVertical: 4, minHeight: 48, justifyContent: 'center' },
   input: { color: '#fff', fontSize: 15.5, maxHeight: 120, paddingVertical: 8 },
   sendBtn: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  sendBtnActive: { backgroundColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
-  sendBtnInactive: { backgroundColor: '#111125', borderWidth: 1, borderColor: '#1e1e3a' },
+  sendBtnActive: { backgroundColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
+  sendBtnInactive: { backgroundColor: '#0f0f1e', borderWidth: 1, borderColor: '#1a1a2e' },
   sendIcon: { fontSize: 20 },
 });
