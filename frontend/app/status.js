@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator, Modal, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -137,7 +137,6 @@ export default function StatusScreen() {
         />
       )}
 
-      {/* Full screen viewer */}
       <Modal visible={!!selectedStatus} transparent animationType="fade" onRequestClose={() => setSelectedStatus(null)}>
         <View style={styles.modal}>
           <View style={styles.modalTop}>

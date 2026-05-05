@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Dimensions, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, Dimensions, Platform, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { storage } from './storage';
@@ -69,14 +69,16 @@ export default function HomeScreen() {
       onLongPress={() => router.push({ pathname: '/chat-options', params: { friendId: item.id, friendName: item.username } })}
       activeOpacity={0.75}>
       <TouchableOpacity onPress={() => router.push({ pathname: '/user-profile', params: { userId: item.id } })} activeOpacity={0.8}>
-        {item.profile_picture ? (
-          <Image source={{ uri: item.profile_picture }} style={styles.chatAvatar} />
-        ) : (
-          <View style={[styles.chatAvatarFallback, { backgroundColor: COLORS[item.id % COLORS.length] }]}>
-            <Text style={styles.chatAvatarLetter}>{item.username[0].toUpperCase()}</Text>
-          </View>
-        )}
-        <View style={styles.onlinePip} />
+        <View style={{ position: 'relative' }}>
+          {item.profile_picture ? (
+            <Image source={{ uri: item.profile_picture }} style={styles.chatAvatar} />
+          ) : (
+            <View style={[styles.chatAvatarFallback, { backgroundColor: COLORS[item.id % COLORS.length] }]}>
+              <Text style={styles.chatAvatarLetter}>{item.username[0].toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.onlinePip} />
+        </View>
       </TouchableOpacity>
       <View style={styles.chatMeta}>
         <View style={styles.chatMetaTop}>
@@ -98,11 +100,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background orbs */}
       <View style={styles.bgOrb1} />
       <View style={styles.bgOrb2} />
 
-      {/* Header */}
       <View style={styles.header}>
         <Animated.Text style={[styles.logo, { color: COLORS[colorIdx], transform: [{ scale: logoAnim }], opacity: logoOpacity }]}>
           SYNC
@@ -125,7 +125,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         {tabs.map(tab => (
           <TouchableOpacity
@@ -140,10 +139,8 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* CHATS */}
       {activeTab === 'chats' && (
         <View style={styles.flex}>
-          {/* Random Match Card */}
           <TouchableOpacity style={styles.randomCard} onPress={() => router.push('/random-match')} activeOpacity={0.85}>
             <View style={styles.randomCardLeft}>
               <View style={styles.randomCardIcon}>
@@ -160,9 +157,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color="#6c63ff" />
-            </View>
+            <View style={styles.center}><ActivityIndicator size="large" color="#6c63ff" /></View>
           ) : friends.length === 0 ? (
             <View style={styles.center}>
               <Text style={styles.emptyIcon}>💬</Text>
@@ -183,7 +178,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* GROUPS */}
       {activeTab === 'groups' && (
         <View style={styles.flex}>
           <TouchableOpacity style={styles.createGroupRow} onPress={() => router.push('/group-chat')} activeOpacity={0.8}>
@@ -204,7 +198,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* STATUS */}
       {activeTab === 'status' && (
         <View style={styles.flex}>
           <TouchableOpacity style={styles.myStatusRow} onPress={() => router.push('/status')} activeOpacity={0.8}>
@@ -222,7 +215,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* CALLS */}
       {activeTab === 'calls' && (
         <View style={styles.center}>
           <Text style={styles.emptyIcon}>📞</Text>
@@ -231,7 +223,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={() => router.push('/find-friends')} activeOpacity={0.85}>
         <Text style={styles.fabIcon}>✉️</Text>
       </TouchableOpacity>

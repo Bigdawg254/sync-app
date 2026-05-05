@@ -13,7 +13,7 @@ export const storage = {
   get: async (key) => {
     try {
       const val = await SecureStore.getItemAsync(key);
-      if (val !== null) return val;
+      if (val !== null && val !== undefined) return val;
     } catch {}
     try {
       if (typeof localStorage !== 'undefined') return localStorage.getItem(key);
@@ -21,11 +21,12 @@ export const storage = {
     return null;
   },
   del: async (key) => {
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {}
+    try { await SecureStore.deleteItemAsync(key); } catch {}
     try {
       if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
     } catch {}
   }
 };
+
+// Required by Expo Router - must have a default export
+export default function Storage() { return null; }
