@@ -7,26 +7,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { storage } from './storage';
-import { API } from '../constants/config';
 
 const { width, height } = Dimensions.get('window');
-
-// Animated particle component
-function Particle({ delay, x, size, opacity }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(anim, { toValue: 1, duration: 4000 + Math.random() * 3000, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, -50] });
-  const op = anim.interpolate({ inputRange: [0, 0.1, 0.9, 1], outputRange: [0, opacity, opacity, 0] });
-  return <Animated.View style={{ position: 'absolute', left: x, width: size, height: size, borderRadius: size / 2, backgroundColor: '#6c63ff', opacity: op, transform: [{ translateY }] }} />;
-}
+const API = 'https://sync-app-production-2ff8.up.railway.app';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -35,39 +18,38 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [checkingAuto, setCheckingAuto] = useState(true);
-  const [focusedField, setFocusedField] = useState(null);
+  const [focused, setFocused] = useState(null);
   const router = useRouter();
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(60)).current;
-  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
-  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
-
-  const particles = useRef(
-    Array.from({ length: 15 }, (_, i) => ({
-      delay: i * 400,
-      x: Math.random() * width,
-      size: Math.random() * 4 + 2,
-      opacity: Math.random() * 0.6 + 0.2,
-    }))
-  ).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(50)).current;
+  const logoScale = useRef(new Animated.Value(0.7)).current;
+  const glow = useRef(new Animated.Value(0.3)).current;
+  const ring1 = useRef(new Animated.Value(1)).current;
+  const ring2 = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    StatusBar.setBarStyle('light-content');
-
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
-      Animated.spring(logoScaleAnim, { toValue: 1, tension: 50, friction: 8, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.spring(slideY, { toValue: 0, tension: 55, friction: 9, useNativeDriver: true }),
+      Animated.spring(logoScale, { toValue: 1, tension: 45, friction: 7, useNativeDriver: true }),
     ]).start();
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0.3, duration: 2500, useNativeDriver: true }),
-      ])
-    ).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 1, duration: 2000, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0.3, duration: 2000, useNativeDriver: true }),
+    ])).start();
+
+    Animated.loop(Animated.sequence([
+      Animated.timing(ring1, { toValue: 1.15, duration: 2500, useNativeDriver: true }),
+      Animated.timing(ring1, { toValue: 1, duration: 2500, useNativeDriver: true }),
+    ])).start();
+
+    Animated.loop(Animated.sequence([
+      Animated.delay(500),
+      Animated.timing(ring2, { toValue: 1.2, duration: 3000, useNativeDriver: true }),
+      Animated.timing(ring2, { toValue: 1, duration: 3000, useNativeDriver: true }),
+    ])).start();
 
     init();
   }, []);
@@ -77,17 +59,17 @@ export default function LoginScreen() {
       const token = await storage.get('userToken');
       if (token) { router.replace('/home'); return; }
       const savedEmail = await storage.get('userEmail');
+      const savedPassword = await storage.get('userPassword');
       if (savedEmail) setEmail(savedEmail);
       if (Platform.OS !== 'web') {
-        const compat = await LocalAuthentication.hasHardwareAsync();
-        const enrolled = await LocalAuthentication.isEnrolledAsync();
-        const savedPassword = await storage.get('userPassword');
-        if (compat && enrolled && savedEmail && savedPassword) {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (hasHardware && isEnrolled && savedEmail && savedPassword) {
           setBiometricAvailable(true);
           setTimeout(() => triggerBiometric(savedEmail, savedPassword), 800);
         }
       }
-    } catch {}
+    } catch (e) { console.log(e); }
     setCheckingAuto(false);
   };
 
@@ -96,17 +78,15 @@ export default function LoginScreen() {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Sign in to Sync',
         fallbackLabel: 'Use Password',
+        disableDeviceFallback: false,
       });
-      if (result.success) await doLogin(e, p);
+      if (result.success) doLogin(e, p);
     } catch {}
   };
 
-  const pressIn = () => Animated.spring(buttonScaleAnim, { toValue: 0.97, useNativeDriver: true }).start();
-  const pressOut = () => Animated.spring(buttonScaleAnim, { toValue: 1, useNativeDriver: true }).start();
-
   const doLogin = async (emailVal, passwordVal) => {
     if (!emailVal?.trim() || !passwordVal?.trim()) {
-      Alert.alert('Missing Fields', 'Please enter your email and password');
+      Alert.alert('Missing Info', 'Please enter your email and password');
       return;
     }
     setLoading(true);
@@ -128,230 +108,241 @@ export default function LoginScreen() {
         Alert.alert('Sign In Failed', data.error || 'Invalid credentials');
       }
     } catch {
-      Alert.alert('Connection Error', 'Cannot reach server. Check your internet.');
+      Alert.alert('No Connection', 'Cannot reach server. Check your internet.');
     }
     setLoading(false);
   };
 
   if (checkingAuto) {
     return (
-      <View style={styles.splash}>
+      <View style={s.splash}>
         <StatusBar barStyle="light-content" />
-        <Animated.View style={[styles.splashGlow, { opacity: glowAnim }]} />
-        <View style={styles.splashLogo}>
-          <View style={styles.splashLogoRing}>
-            <Text style={styles.splashLogoLetter}>S</Text>
-          </View>
+        <Animated.View style={[s.splashGlow, { opacity: glow }]} />
+        <View style={s.splashBox}>
+          <Text style={s.splashS}>S</Text>
         </View>
-        <Text style={styles.splashTitle}>sync</Text>
-        <Text style={styles.splashSub}>connect · vibe · belong</Text>
+        <Text style={s.splashName}>sync</Text>
+        <Text style={s.splashTag}>connect · vibe · belong</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="#02020a" />
 
-      {/* Floating particles */}
-      {particles.map((p, i) => <Particle key={i} {...p} />)}
+      {/* Background orbs */}
+      <View style={[s.orb, { width: 380, height: 380, top: -160, left: -130, opacity: 0.12 }]} />
+      <View style={[s.orb, { width: 260, height: 260, top: height * 0.42, right: -100, opacity: 0.07 }]} />
+      <View style={[s.orb, { width: 180, height: 180, bottom: 80, left: -60, opacity: 0.05 }]} />
 
-      {/* Background gradient mesh */}
-      <View style={styles.meshBg} />
-      <View style={styles.meshBg2} />
-      <View style={styles.meshBg3} />
+      {/* Star dots scattered around */}
+      {[...Array(18)].map((_, i) => (
+        <View key={i} style={[s.star, {
+          top: (Math.sin(i * 2.4) * 0.5 + 0.5) * height,
+          left: (Math.cos(i * 1.7) * 0.5 + 0.5) * width,
+          width: i % 3 === 0 ? 3 : i % 3 === 1 ? 2 : 1.5,
+          height: i % 3 === 0 ? 3 : i % 3 === 1 ? 2 : 1.5,
+          opacity: 0.15 + (i % 5) * 0.07,
+        }]} />
+      ))}
 
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          bounces={false}>
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
 
-          {/* Hero Section */}
-          <Animated.View style={[styles.hero, { opacity: fadeAnim }]}>
-            {/* Logo */}
-            <Animated.View style={[styles.logoWrap, { transform: [{ scale: logoScaleAnim }] }]}>
-              <Animated.View style={[styles.logoGlow, { opacity: glowAnim }]} />
-              <View style={styles.logoHex}>
-                <View style={styles.logoHexInner}>
-                  <Text style={styles.logoLetter}>S</Text>
+          {/* Logo area */}
+          <Animated.View style={[s.logoArea, { opacity: fade }]}>
+            <Animated.View style={[s.logoWrap, { transform: [{ scale: logoScale }] }]}>
+              {/* Outer glow */}
+              <Animated.View style={[s.logoGlowBig, { opacity: glow }]} />
+              {/* Breathing rings */}
+              <Animated.View style={[s.logoRing, s.logoRingOuter, { transform: [{ scale: ring2 }] }]} />
+              <Animated.View style={[s.logoRing, s.logoRingInner, { transform: [{ scale: ring1 }] }]} />
+              {/* Main logo box */}
+              <View style={s.logoBox}>
+                <View style={s.logoBoxInner}>
+                  <Text style={s.logoS}>S</Text>
                 </View>
-                {/* Orbiting rings */}
-                <View style={styles.orbitRing1} />
-                <View style={styles.orbitRing2} />
-                {/* Corner accents */}
-                <View style={[styles.cornerDot, { top: -4, right: 16 }]} />
-                <View style={[styles.cornerDot, styles.cornerDotSm, { bottom: 8, left: 12 }]} />
-                <View style={[styles.cornerDot, styles.cornerDotXs, { top: 14, left: -4 }]} />
+                {/* Highlight */}
+                <View style={s.logoHighlight} />
+                {/* Bottom shadow */}
+                <View style={s.logoShadow} />
               </View>
+              {/* Floating accent dots */}
+              <View style={[s.accentDot, { top: 6, right: 18, width: 10, height: 10 }]} />
+              <View style={[s.accentDot, { bottom: 14, left: 18, width: 7, height: 7, opacity: 0.6 }]} />
+              <View style={[s.accentDot, { top: 22, left: 10, width: 5, height: 5, opacity: 0.4 }]} />
             </Animated.View>
 
-            <Text style={styles.appTitle}>sync</Text>
-            <View style={styles.taglineRow}>
-              <View style={styles.taglineDash} />
-              <Text style={styles.tagline}>where connections reach new heights</Text>
-              <View style={styles.taglineDash} />
+            <Text style={s.appName}>sync</Text>
+            <View style={s.tagRow}>
+              <View style={s.tagLine} />
+              <Text style={s.tagText}>connect · vibe · belong</Text>
+              <View style={s.tagLine} />
             </View>
           </Animated.View>
 
-          {/* Form */}
-          <Animated.View style={[styles.formWrap, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          {/* Form card */}
+          <Animated.View style={[s.card, { opacity: fade, transform: [{ translateY: slideY }] }]}>
+            {/* Top accent bar */}
+            <View style={s.cardAccent} />
 
-            {/* Glass card */}
-            <View style={styles.glassCard}>
-              {/* Card top accent */}
-              <View style={styles.cardTopAccent} />
+            <Text style={s.cardTitle}>Welcome back 👋</Text>
+            <Text style={s.cardSub}>Sign in to continue</Text>
 
-              <Text style={styles.formHeading}>Welcome back</Text>
-              <Text style={styles.formSubheading}>Sign in to continue your journey</Text>
+            {/* Email field */}
+            <View style={s.fieldLabel}>
+              <Text style={s.fieldLabelText}>EMAIL</Text>
+            </View>
+            <View style={[s.fieldBox, focused === 'email' && s.fieldBoxFocused]}>
+              <Text style={s.fieldIcon}>✉</Text>
+              <TextInput
+                style={s.fieldInput}
+                placeholder="your@email.com"
+                placeholderTextColor="#151525"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused(null)}
+              />
+            </View>
 
-              {/* Email */}
-              <View style={[styles.inputWrap, focusedField === 'email' && styles.inputWrapFocused]}>
-                <Text style={styles.inputPrefix}>✉</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email address"
-                  placeholderTextColor="#1e1e35"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                />
-              </View>
-
-              {/* Password */}
-              <View style={[styles.inputWrap, focusedField === 'password' && styles.inputWrapFocused]}>
-                <Text style={styles.inputPrefix}>⬡</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#1e1e35"
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                  autoCorrect={false}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(s => !s)} style={styles.eyeBtn}>
-                  <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Forgot */}
-              <TouchableOpacity onPress={() => router.push('/reset-password')} style={styles.forgotRow}>
-                <Text style={styles.forgotText}>Forgot password?</Text>
+            {/* Password field */}
+            <View style={s.fieldLabel}>
+              <Text style={s.fieldLabelText}>PASSWORD</Text>
+            </View>
+            <View style={[s.fieldBox, focused === 'password' && s.fieldBoxFocused]}>
+              <Text style={s.fieldIcon}>🔒</Text>
+              <TextInput
+                style={s.fieldInput}
+                placeholder="Your password"
+                placeholderTextColor="#151525"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                autoCorrect={false}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={s.eyeBtn}>
+                <Text style={{ fontSize: 17 }}>{showPassword ? '🙈' : '👁️'}</Text>
               </TouchableOpacity>
+            </View>
 
-              {/* Sign in button */}
-              <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-                <TouchableOpacity
-                  style={[styles.signInBtn, loading && styles.signInBtnLoading]}
-                  onPress={() => doLogin(email, password)}
-                  onPressIn={pressIn}
-                  onPressOut={pressOut}
-                  disabled={loading}
-                  activeOpacity={1}>
-                  <View style={styles.signInBtnBg} />
-                  <Text style={styles.signInBtnText}>
-                    {loading ? '✦  Signing in...' : 'Sign In  →'}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
+            <TouchableOpacity onPress={() => router.push('/reset-password')} style={s.forgotRow}>
+              <Text style={s.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
 
-              {/* Biometric */}
-              {biometricAvailable && (
-                <TouchableOpacity
-                  style={styles.bioBtn}
-                  onPress={() => triggerBiometric(email, password)}
-                  activeOpacity={0.8}>
-                  <Text style={styles.bioBtnText}>🔐  Continue with Fingerprint</Text>
-                </TouchableOpacity>
-              )}
+            {/* Sign in */}
+            <TouchableOpacity
+              style={[s.signBtn, loading && s.signBtnOff]}
+              onPress={() => doLogin(email, password)}
+              disabled={loading}
+              activeOpacity={0.88}>
+              <Animated.View style={[s.signBtnSheen, { opacity: glow }]} />
+              <Text style={s.signBtnText}>{loading ? 'Signing in...' : 'Sign In  →'}</Text>
+            </TouchableOpacity>
 
-              {/* Divider */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerLabel}>·  NEW TO SYNC  ·</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Create account */}
-              <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/signup')} activeOpacity={0.85}>
-                <Text style={styles.createBtnText}>Create Account</Text>
+            {/* Biometric - always shown if available */}
+            {biometricAvailable && (
+              <TouchableOpacity
+                style={s.bioBtn}
+                onPress={() => triggerBiometric(email, password)}
+                activeOpacity={0.8}>
+                <Text style={s.bioBtnIcon}>🔐</Text>
+                <Text style={s.bioBtnText}>Continue with Fingerprint</Text>
               </TouchableOpacity>
+            )}
 
-              <Text style={styles.termsText}>
-                By continuing you agree to our{' '}
-                <Text style={styles.termsLink}>Terms of Service</Text>
-                {' '}and{' '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>
+            {/* Note for Expo Go users */}
+            {Platform.OS !== 'web' && !biometricAvailable && (
+              <Text style={s.bioNote}>
+                💡 Fingerprint login available in the installed APK
               </Text>
+            )}
+
+            <View style={s.divRow}>
+              <View style={s.divLine} />
+              <Text style={s.divText}>or</Text>
+              <View style={s.divLine} />
             </View>
+
+            <TouchableOpacity style={s.createBtn} onPress={() => router.push('/signup')} activeOpacity={0.88}>
+              <Text style={s.createBtnText}>Create Account</Text>
+            </TouchableOpacity>
+
+            <Text style={s.terms}>
+              By continuing you agree to our Terms of Service & Privacy Policy
+            </Text>
           </Animated.View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#02020a' },
+const PURPLE = '#6c63ff';
+const BG = '#02020a';
+const CARD = '#05050f';
+const BORDER = '#0d0d1e';
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BG },
   flex: { flex: 1 },
-  splash: { flex: 1, backgroundColor: '#02020a', justifyContent: 'center', alignItems: 'center' },
-  splashGlow: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#6c63ff', opacity: 0.15 },
-  splashLogo: { width: 96, height: 96, borderRadius: 30, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 40, elevation: 30 },
-  splashLogoRing: { width: 80, height: 80, borderRadius: 24, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },
-  splashLogoLetter: { fontSize: 44, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
-  splashTitle: { color: '#fff', fontSize: 36, fontWeight: '200', letterSpacing: 14, marginTop: 24 },
-  splashSub: { color: 'rgba(108,99,255,0.6)', fontSize: 12, letterSpacing: 4, marginTop: 10 },
-  meshBg: { position: 'absolute', width: 400, height: 400, borderRadius: 200, backgroundColor: 'rgba(108,99,255,0.07)', top: -150, left: -120 },
-  meshBg2: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(108,99,255,0.05)', top: height * 0.35, right: -100 },
-  meshBg3: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(180,100,255,0.04)', bottom: 60, left: -60 },
+  splash: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
+  splashGlow: { position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: PURPLE, opacity: 0.15 },
+  splashBox: { width: 96, height: 96, borderRadius: 30, backgroundColor: PURPLE, justifyContent: 'center', alignItems: 'center', shadowColor: PURPLE, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 40, elevation: 30 },
+  splashS: { fontSize: 52, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
+  splashName: { color: '#fff', fontSize: 36, fontWeight: '200', letterSpacing: 14, marginTop: 22 },
+  splashTag: { color: `${PURPLE}88`, fontSize: 12, letterSpacing: 4, marginTop: 10 },
+  orb: { position: 'absolute', borderRadius: 999, backgroundColor: PURPLE },
+  star: { position: 'absolute', borderRadius: 2, backgroundColor: '#ffffff' },
   scroll: { flexGrow: 1, paddingBottom: 40 },
-  hero: { alignItems: 'center', paddingTop: Platform.OS === 'ios' ? height * 0.09 : height * 0.07, paddingBottom: 32 },
-  logoWrap: { alignItems: 'center', justifyContent: 'center', width: 160, height: 160, marginBottom: 20 },
-  logoGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: '#6c63ff', opacity: 0.12 },
-  logoHex: { width: 110, height: 110, borderRadius: 32, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 32, elevation: 25, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', position: 'relative' },
-  logoHexInner: { width: 88, height: 88, borderRadius: 26, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  logoLetter: { fontSize: 52, fontWeight: '900', color: '#fff', fontStyle: 'italic', letterSpacing: -2, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 2, height: 4 }, textShadowRadius: 8 },
-  orbitRing1: { position: 'absolute', width: 128, height: 128, borderRadius: 40, borderWidth: 1, borderColor: 'rgba(108,99,255,0.3)', borderStyle: 'dashed' },
-  orbitRing2: { position: 'absolute', width: 148, height: 148, borderRadius: 46, borderWidth: 0.5, borderColor: 'rgba(108,99,255,0.15)' },
-  cornerDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6, elevation: 6 },
-  cornerDotSm: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.7 },
-  cornerDotXs: { width: 5, height: 5, borderRadius: 2.5, opacity: 0.5 },
-  appTitle: { fontSize: 46, fontWeight: '200', color: '#fff', letterSpacing: 18, marginBottom: 14 },
-  taglineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  taglineDash: { width: 24, height: 1, backgroundColor: 'rgba(108,99,255,0.5)' },
-  tagline: { color: 'rgba(108,99,255,0.65)', fontSize: 11, letterSpacing: 2 },
-  formWrap: { paddingHorizontal: 20 },
-  glassCard: { backgroundColor: 'rgba(8,8,20,0.95)', borderRadius: 28, padding: 28, borderWidth: 1, borderColor: '#0f0f22', overflow: 'hidden' },
-  cardTopAccent: { position: 'absolute', top: 0, left: 40, right: 40, height: 1, backgroundColor: '#6c63ff', opacity: 0.5 },
-  formHeading: { color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
-  formSubheading: { color: '#2a2a45', fontSize: 14, marginBottom: 28 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#04040e', borderRadius: 16, borderWidth: 1, borderColor: '#0f0f22', paddingHorizontal: 16, height: 58, marginBottom: 14 },
-  inputWrapFocused: { borderColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  inputPrefix: { color: '#6c63ff', fontSize: 16, marginRight: 12, width: 24 },
-  input: { flex: 1, color: '#fff', fontSize: 15 },
-  eyeBtn: { padding: 6 },
-  eyeText: { fontSize: 17 },
-  forgotRow: { alignItems: 'flex-end', marginBottom: 22, marginTop: 2 },
-  forgotText: { color: '#6c63ff', fontSize: 13 },
-  signInBtn: { height: 58, borderRadius: 18, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 15 },
-  signInBtnBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#6c63ff' },
-  signInBtnLoading: { opacity: 0.7, shadowOpacity: 0 },
-  signInBtnText: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 1, zIndex: 1 },
-  bioBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 16, marginTop: 12, backgroundColor: '#04040e', borderWidth: 1, borderColor: '#6c63ff33' },
-  bioBtnText: { color: '#6c63ff', fontWeight: '600', fontSize: 14 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 22, gap: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#0a0a18' },
-  dividerLabel: { color: '#111128', fontSize: 9, letterSpacing: 3 },
-  createBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#6c63ff33', backgroundColor: '#04040e' },
-  createBtnText: { color: '#6c63ff', fontWeight: '700', fontSize: 15 },
-  termsText: { color: '#0d0d20', fontSize: 11, textAlign: 'center', marginTop: 18, lineHeight: 16 },
-  termsLink: { color: '#1a1a35' },
+  logoArea: { alignItems: 'center', paddingTop: Platform.OS === 'ios' ? height * 0.08 : height * 0.06, paddingBottom: 28 },
+  logoWrap: { width: 170, height: 170, justifyContent: 'center', alignItems: 'center', marginBottom: 18 },
+  logoGlowBig: { position: 'absolute', width: 170, height: 170, borderRadius: 85, backgroundColor: PURPLE, opacity: 0.1 },
+  logoRing: { position: 'absolute', borderRadius: 999 },
+  logoRingOuter: { width: 155, height: 155, borderWidth: 0.8, borderColor: `${PURPLE}25` },
+  logoRingInner: { width: 135, height: 135, borderWidth: 1.2, borderColor: `${PURPLE}40` },
+  logoBox: { width: 108, height: 108, borderRadius: 34, backgroundColor: PURPLE, justifyContent: 'center', alignItems: 'center', shadowColor: PURPLE, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 30, elevation: 25, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
+  logoBoxInner: { width: 90, height: 90, borderRadius: 28, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  logoS: { fontSize: 56, fontWeight: '900', color: '#fff', fontStyle: 'italic', letterSpacing: -2, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 2, height: 4 }, textShadowRadius: 10 },
+  logoHighlight: { position: 'absolute', top: 0, left: 0, right: 0, height: 44, backgroundColor: 'rgba(255,255,255,0.08)', borderTopLeftRadius: 34, borderTopRightRadius: 34 },
+  logoShadow: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, backgroundColor: 'rgba(0,0,0,0.2)', borderBottomLeftRadius: 34, borderBottomRightRadius: 34 },
+  accentDot: { position: 'absolute', borderRadius: 99, backgroundColor: PURPLE, shadowColor: PURPLE, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6, elevation: 6 },
+  appName: { fontSize: 44, fontWeight: '200', color: '#fff', letterSpacing: 16, marginBottom: 12 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tagLine: { width: 28, height: 1, backgroundColor: `${PURPLE}55` },
+  tagText: { color: `${PURPLE}80`, fontSize: 11, letterSpacing: 3 },
+  card: { marginHorizontal: 18, backgroundColor: CARD, borderRadius: 28, padding: 26, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: 40 },
+  cardAccent: { position: 'absolute', top: 0, left: 44, right: 44, height: 1.5, backgroundColor: PURPLE, opacity: 0.6 },
+  cardTitle: { color: '#fff', fontSize: 23, fontWeight: '700', marginBottom: 5, letterSpacing: 0.3 },
+  cardSub: { color: '#1a1a32', fontSize: 14, marginBottom: 26 },
+  fieldLabel: { marginBottom: 7 },
+  fieldLabelText: { color: '#111128', fontSize: 10, fontWeight: '700', letterSpacing: 3 },
+  fieldBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#030309', borderRadius: 15, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, height: 56, marginBottom: 16 },
+  fieldBoxFocused: { borderColor: PURPLE, shadowColor: PURPLE, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
+  fieldIcon: { color: PURPLE, fontSize: 15, marginRight: 11, width: 22, textAlign: 'center' },
+  fieldInput: { flex: 1, color: '#fff', fontSize: 15 },
+  eyeBtn: { padding: 5 },
+  forgotRow: { alignItems: 'flex-end', marginBottom: 22, marginTop: -4 },
+  forgotText: { color: PURPLE, fontSize: 13 },
+  signBtn: { height: 56, borderRadius: 16, backgroundColor: PURPLE, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', shadowColor: PURPLE, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.55, shadowRadius: 18, elevation: 14 },
+  signBtnOff: { opacity: 0.65, shadowOpacity: 0 },
+  signBtnSheen: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%', backgroundColor: 'rgba(255,255,255,0.07)', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  signBtnText: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 0.8, zIndex: 1 },
+  bioBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 54, borderRadius: 15, marginTop: 12, backgroundColor: '#030309', borderWidth: 1, borderColor: `${PURPLE}44`, gap: 10 },
+  bioBtnIcon: { fontSize: 20 },
+  bioBtnText: { color: PURPLE, fontWeight: '600', fontSize: 14 },
+  bioNote: { color: '#111128', fontSize: 11, textAlign: 'center', marginTop: 10 },
+  divRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 14 },
+  divLine: { flex: 1, height: 1, backgroundColor: '#080818' },
+  divText: { color: '#111128', fontSize: 12 },
+  createBtn: { height: 54, borderRadius: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: `${PURPLE}44`, backgroundColor: '#030309' },
+  createBtnText: { color: PURPLE, fontWeight: '700', fontSize: 15 },
+  terms: { color: '#0a0a18', fontSize: 10, textAlign: 'center', marginTop: 16, lineHeight: 15 },
 });
