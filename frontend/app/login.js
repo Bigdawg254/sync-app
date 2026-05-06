@@ -1,91 +1,32 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, Dimensions, Animated } from 'react-native';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, KeyboardAvoidingView, Platform, ScrollView,
+  Dimensions, Animated, StatusBar
+} from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { storage } from './storage';
+import { API } from '../constants/config';
 
 const { width, height } = Dimensions.get('window');
-const API = 'https://sync-app-production-2ff8.up.railway.app';
 
-// Burj Khalifa silhouette drawn with pure React Native views
-function BurjKhalifa() {
-  return (
-    <View style={bk.container}>
-      {/* Sky gradient layers */}
-      <View style={bk.skyLayer1} />
-      <View style={bk.skyLayer2} />
-      <View style={bk.skyLayer3} />
-
-      {/* Stars */}
-      {[...Array(20)].map((_, i) => (
-        <View key={i} style={[bk.star, {
-          top: Math.random() * 120,
-          left: Math.random() * width,
-          width: Math.random() > 0.5 ? 2 : 1,
-          height: Math.random() > 0.5 ? 2 : 1,
-          opacity: Math.random() * 0.8 + 0.2
-        }]} />
-      ))}
-
-      {/* Ground/city base */}
-      <View style={bk.cityBase} />
-
-      {/* City buildings silhouette */}
-      <View style={[bk.building, { height: 60, width: 18, bottom: 20, left: width * 0.05 }]} />
-      <View style={[bk.building, { height: 80, width: 22, bottom: 20, left: width * 0.12 }]} />
-      <View style={[bk.building, { height: 55, width: 16, bottom: 20, left: width * 0.22 }]} />
-      <View style={[bk.building, { height: 95, width: 28, bottom: 20, left: width * 0.3 }]} />
-      <View style={[bk.building, { height: 70, width: 20, bottom: 20, left: width * 0.43 }]} />
-      <View style={[bk.building, { height: 50, width: 18, bottom: 20, right: width * 0.22 }]} />
-      <View style={[bk.building, { height: 75, width: 24, bottom: 20, right: width * 0.12 }]} />
-      <View style={[bk.building, { height: 60, width: 20, bottom: 20, right: width * 0.04 }]} />
-
-      {/* Burj Khalifa - centered, tall */}
-      {/* Base section */}
-      <View style={[bk.burjSection, { width: 52, height: 30, bottom: 80, alignSelf: 'center' }]} />
-      {/* Middle section */}
-      <View style={[bk.burjSection, { width: 40, height: 50, bottom: 108, alignSelf: 'center' }]} />
-      {/* Upper section */}
-      <View style={[bk.burjSection, { width: 30, height: 60, bottom: 156, alignSelf: 'center' }]} />
-      {/* Slim upper */}
-      <View style={[bk.burjSection, { width: 20, height: 70, bottom: 214, alignSelf: 'center' }]} />
-      {/* Needle section */}
-      <View style={[bk.burjSection, { width: 12, height: 80, bottom: 282, alignSelf: 'center' }]} />
-      {/* Tip */}
-      <View style={[bk.burjTip, { bottom: 360, alignSelf: 'center' }]} />
-
-      {/* Windows on Burj - lit up */}
-      {[...Array(12)].map((_, i) => (
-        <View key={i} style={[bk.burjWindow, {
-          bottom: 100 + (i * 22),
-          alignSelf: 'center',
-          left: width / 2 - 6 + (i % 3 === 0 ? -8 : i % 3 === 1 ? 0 : 8)
-        }]} />
-      ))}
-
-      {/* Purple glow at base of Burj */}
-      <View style={bk.burjGlow} />
-
-      {/* Moon */}
-      <View style={bk.moon} />
-    </View>
-  );
+// Animated particle component
+function Particle({ delay, x, size, opacity }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, { toValue: 1, duration: 4000 + Math.random() * 3000, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, -50] });
+  const op = anim.interpolate({ inputRange: [0, 0.1, 0.9, 1], outputRange: [0, opacity, opacity, 0] });
+  return <Animated.View style={{ position: 'absolute', left: x, width: size, height: size, borderRadius: size / 2, backgroundColor: '#6c63ff', opacity: op, transform: [{ translateY }] }} />;
 }
-
-const bk = StyleSheet.create({
-  container: { width: '100%', height: 280, overflow: 'hidden', position: 'relative' },
-  skyLayer1: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#02020a' },
-  skyLayer2: { position: 'absolute', top: 0, left: 0, right: 0, height: 180, backgroundColor: 'rgba(108,99,255,0.08)' },
-  skyLayer3: { position: 'absolute', top: 0, left: 0, right: 0, height: 100, backgroundColor: 'rgba(108,99,255,0.05)' },
-  star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 2 },
-  cityBase: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 22, backgroundColor: '#0a0a16' },
-  building: { position: 'absolute', backgroundColor: '#0d0d1e', borderTopLeftRadius: 2, borderTopRightRadius: 2 },
-  burjSection: { position: 'absolute', backgroundColor: '#111128', borderTopLeftRadius: 3, borderTopRightRadius: 3 },
-  burjTip: { position: 'absolute', width: 4, height: 30, backgroundColor: '#6c63ff', borderRadius: 2, shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10, elevation: 15 },
-  burjWindow: { position: 'absolute', width: 3, height: 3, backgroundColor: 'rgba(108,99,255,0.6)', borderRadius: 1 },
-  burjGlow: { position: 'absolute', bottom: 60, alignSelf: 'center', width: 100, height: 40, backgroundColor: 'rgba(108,99,255,0.12)', borderRadius: 50 },
-  moon: { position: 'absolute', top: 24, right: width * 0.15, width: 28, height: 28, borderRadius: 14, backgroundColor: '#e8e0ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 16, elevation: 10 },
-});
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -94,24 +35,37 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [checkingAuto, setCheckingAuto] = useState(true);
+  const [focusedField, setFocusedField] = useState(null);
   const router = useRouter();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const glowAnim = useRef(new Animated.Value(0.4)).current;
-  const towerAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(60)).current;
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+
+  const particles = useRef(
+    Array.from({ length: 15 }, (_, i) => ({
+      delay: i * 400,
+      x: Math.random() * width,
+      size: Math.random() * 4 + 2,
+      opacity: Math.random() * 0.6 + 0.2,
+    }))
+  ).current;
 
   useEffect(() => {
+    StatusBar.setBarStyle('light-content');
+
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 1000, useNativeDriver: true }),
-      Animated.timing(towerAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
+      Animated.spring(logoScaleAnim, { toValue: 1, tension: 50, friction: 8, useNativeDriver: true }),
     ]).start();
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0.4, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.3, duration: 2500, useNativeDriver: true }),
       ])
     ).start();
 
@@ -123,15 +77,14 @@ export default function LoginScreen() {
       const token = await storage.get('userToken');
       if (token) { router.replace('/home'); return; }
       const savedEmail = await storage.get('userEmail');
-      const savedPassword = await storage.get('userPassword');
       if (savedEmail) setEmail(savedEmail);
-      if (savedPassword) setPassword(savedPassword);
       if (Platform.OS !== 'web') {
         const compat = await LocalAuthentication.hasHardwareAsync();
         const enrolled = await LocalAuthentication.isEnrolledAsync();
+        const savedPassword = await storage.get('userPassword');
         if (compat && enrolled && savedEmail && savedPassword) {
           setBiometricAvailable(true);
-          setTimeout(() => triggerBiometric(savedEmail, savedPassword), 1000);
+          setTimeout(() => triggerBiometric(savedEmail, savedPassword), 800);
         }
       }
     } catch {}
@@ -148,8 +101,14 @@ export default function LoginScreen() {
     } catch {}
   };
 
+  const pressIn = () => Animated.spring(buttonScaleAnim, { toValue: 0.97, useNativeDriver: true }).start();
+  const pressOut = () => Animated.spring(buttonScaleAnim, { toValue: 1, useNativeDriver: true }).start();
+
   const doLogin = async (emailVal, passwordVal) => {
-    if (!emailVal?.trim() || !passwordVal?.trim()) { Alert.alert('Error', 'Please fill in all fields'); return; }
+    if (!emailVal?.trim() || !passwordVal?.trim()) {
+      Alert.alert('Missing Fields', 'Please enter your email and password');
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
@@ -166,119 +125,173 @@ export default function LoginScreen() {
         await storage.set('userPassword', passwordVal);
         router.replace('/home');
       } else {
-        Alert.alert('Login Failed', data.error);
+        Alert.alert('Sign In Failed', data.error || 'Invalid credentials');
       }
-    } catch { Alert.alert('Error', 'Cannot connect. Check your internet.'); }
+    } catch {
+      Alert.alert('Connection Error', 'Cannot reach server. Check your internet.');
+    }
     setLoading(false);
   };
 
   if (checkingAuto) {
     return (
       <View style={styles.splash}>
+        <StatusBar barStyle="light-content" />
         <Animated.View style={[styles.splashGlow, { opacity: glowAnim }]} />
         <View style={styles.splashLogo}>
-          <Text style={styles.splashLogoText}>S</Text>
+          <View style={styles.splashLogoRing}>
+            <Text style={styles.splashLogoLetter}>S</Text>
+          </View>
         </View>
-        <Text style={styles.splashName}>sync</Text>
+        <Text style={styles.splashTitle}>sync</Text>
+        <Text style={styles.splashSub}>connect · vibe · belong</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#02020a" />
+
+      {/* Floating particles */}
+      {particles.map((p, i) => <Particle key={i} {...p} />)}
+
+      {/* Background gradient mesh */}
+      <View style={styles.meshBg} />
+      <View style={styles.meshBg2} />
+      <View style={styles.meshBg3} />
+
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
 
-          {/* Burj Khalifa scene */}
-          <Animated.View style={{ opacity: towerAnim }}>
-            <BurjKhalifa />
-          </Animated.View>
-
-          {/* Logo overlay on the scene */}
-          <View style={styles.logoOverlay}>
-            <Animated.View style={[styles.logoMark, { opacity: glowAnim }]}>
-              <View style={styles.logoMarkInner}>
-                <Text style={styles.logoMarkS}>S</Text>
+          {/* Hero Section */}
+          <Animated.View style={[styles.hero, { opacity: fadeAnim }]}>
+            {/* Logo */}
+            <Animated.View style={[styles.logoWrap, { transform: [{ scale: logoScaleAnim }] }]}>
+              <Animated.View style={[styles.logoGlow, { opacity: glowAnim }]} />
+              <View style={styles.logoHex}>
+                <View style={styles.logoHexInner}>
+                  <Text style={styles.logoLetter}>S</Text>
+                </View>
+                {/* Orbiting rings */}
+                <View style={styles.orbitRing1} />
+                <View style={styles.orbitRing2} />
+                {/* Corner accents */}
+                <View style={[styles.cornerDot, { top: -4, right: 16 }]} />
+                <View style={[styles.cornerDot, styles.cornerDotSm, { bottom: 8, left: 12 }]} />
+                <View style={[styles.cornerDot, styles.cornerDotXs, { top: 14, left: -4 }]} />
               </View>
             </Animated.View>
-          </View>
 
-          {/* App name */}
-          <Animated.View style={[styles.appNameWrap, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <Text style={styles.appName}>SYNC</Text>
-            <Text style={styles.appTagline}>where connections reach new heights</Text>
+            <Text style={styles.appTitle}>sync</Text>
+            <View style={styles.taglineRow}>
+              <View style={styles.taglineDash} />
+              <Text style={styles.tagline}>where connections reach new heights</Text>
+              <View style={styles.taglineDash} />
+            </View>
           </Animated.View>
 
-          {/* Form card */}
-          <Animated.View style={[styles.formCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.formCardTop}>
-              <View style={styles.formCardDot} />
-              <View style={[styles.formCardDot, { opacity: 0.5 }]} />
-              <View style={[styles.formCardDot, { opacity: 0.3 }]} />
-            </View>
+          {/* Form */}
+          <Animated.View style={[styles.formWrap, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
-            <Text style={styles.formTitle}>Sign In</Text>
+            {/* Glass card */}
+            <View style={styles.glassCard}>
+              {/* Card top accent */}
+              <View style={styles.cardTopAccent} />
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMAIL</Text>
-              <View style={styles.inputBox}>
-                <Text style={styles.inputIconText}>@</Text>
+              <Text style={styles.formHeading}>Welcome back</Text>
+              <Text style={styles.formSubheading}>Sign in to continue your journey</Text>
+
+              {/* Email */}
+              <View style={[styles.inputWrap, focusedField === 'email' && styles.inputWrapFocused]}>
+                <Text style={styles.inputPrefix}>✉</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="your@email.com"
-                  placeholderTextColor="#1a1a2a"
+                  placeholder="Email address"
+                  placeholderTextColor="#1e1e35"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
                 />
               </View>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputBox}>
-                <Text style={styles.inputIconText}>•••</Text>
+              {/* Password */}
+              <View style={[styles.inputWrap, focusedField === 'password' && styles.inputWrapFocused]}>
+                <Text style={styles.inputPrefix}>⬡</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Your password"
-                  placeholderTextColor="#1a1a2a"
+                  placeholder="Password"
+                  placeholderTextColor="#1e1e35"
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                   autoCorrect={false}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  <Text style={{ fontSize: 16 }}>{showPassword ? '🙈' : '👁️'}</Text>
+                <TouchableOpacity onPress={() => setShowPassword(s => !s)} style={styles.eyeBtn}>
+                  <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
                 </TouchableOpacity>
               </View>
-            </View>
 
-            <TouchableOpacity onPress={() => router.push('/reset-password')} style={styles.forgotRow}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.signInBtn, loading && styles.signInBtnOff]} onPress={() => doLogin(email, password)} disabled={loading} activeOpacity={0.85}>
-              <Animated.View style={[styles.signInBtnGlow, { opacity: glowAnim }]} />
-              <Text style={styles.signInBtnText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
-            </TouchableOpacity>
-
-            {biometricAvailable && (
-              <TouchableOpacity style={styles.bioBtn} onPress={() => triggerBiometric(email, password)} activeOpacity={0.8}>
-                <Text style={styles.bioBtnText}>🔐  Use Fingerprint</Text>
+              {/* Forgot */}
+              <TouchableOpacity onPress={() => router.push('/reset-password')} style={styles.forgotRow}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
-            )}
 
-            <View style={styles.orRow}>
-              <View style={styles.orLine} />
-              <Text style={styles.orText}>NEW HERE?</Text>
-              <View style={styles.orLine} />
+              {/* Sign in button */}
+              <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+                <TouchableOpacity
+                  style={[styles.signInBtn, loading && styles.signInBtnLoading]}
+                  onPress={() => doLogin(email, password)}
+                  onPressIn={pressIn}
+                  onPressOut={pressOut}
+                  disabled={loading}
+                  activeOpacity={1}>
+                  <View style={styles.signInBtnBg} />
+                  <Text style={styles.signInBtnText}>
+                    {loading ? '✦  Signing in...' : 'Sign In  →'}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Biometric */}
+              {biometricAvailable && (
+                <TouchableOpacity
+                  style={styles.bioBtn}
+                  onPress={() => triggerBiometric(email, password)}
+                  activeOpacity={0.8}>
+                  <Text style={styles.bioBtnText}>🔐  Continue with Fingerprint</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerLabel}>·  NEW TO SYNC  ·</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Create account */}
+              <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/signup')} activeOpacity={0.85}>
+                <Text style={styles.createBtnText}>Create Account</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.termsText}>
+                By continuing you agree to our{' '}
+                <Text style={styles.termsLink}>Terms of Service</Text>
+                {' '}and{' '}
+                <Text style={styles.termsLink}>Privacy Policy</Text>
+              </Text>
             </View>
-
-            <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/signup')} activeOpacity={0.85}>
-              <Text style={styles.createBtnText}>Create Account</Text>
-            </TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -287,42 +300,58 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#02020a' },
+  root: { flex: 1, backgroundColor: '#02020a' },
   flex: { flex: 1 },
   splash: { flex: 1, backgroundColor: '#02020a', justifyContent: 'center', alignItems: 'center' },
-  splashGlow: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(108,99,255,0.2)' },
-  splashLogo: { width: 90, height: 90, borderRadius: 28, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 40, elevation: 30 },
-  splashLogoText: { fontSize: 48, fontWeight: 'bold', color: '#fff', fontStyle: 'italic' },
-  splashName: { color: '#fff', fontSize: 32, fontWeight: '200', letterSpacing: 12, marginTop: 20 },
-  scroll: { flexGrow: 1 },
-  logoOverlay: { position: 'absolute', top: 180, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
-  logoMark: { width: 64, height: 64, borderRadius: 20, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 24, elevation: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  logoMarkInner: { width: 52, height: 52, borderRadius: 15, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  logoMarkS: { fontSize: 30, fontWeight: 'bold', color: '#fff', fontStyle: 'italic' },
-  appNameWrap: { alignItems: 'center', paddingTop: 48, paddingBottom: 20 },
-  appName: { fontSize: 44, fontWeight: '200', color: '#fff', letterSpacing: 16 },
-  appTagline: { color: 'rgba(108,99,255,0.6)', fontSize: 11, letterSpacing: 3, marginTop: 8, textAlign: 'center' },
-  formCard: { marginHorizontal: 20, backgroundColor: '#06060e', borderRadius: 28, padding: 28, borderWidth: 1, borderColor: '#0d0d1e', marginBottom: 48, overflow: 'hidden' },
-  formCardTop: { flexDirection: 'row', gap: 6, marginBottom: 24 },
-  formCardDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6c63ff' },
-  formTitle: { color: '#fff', fontSize: 22, fontWeight: '600', marginBottom: 24, letterSpacing: 1 },
-  inputGroup: { marginBottom: 18 },
-  inputLabel: { color: '#1e1e3a', fontSize: 10, fontWeight: 'bold', letterSpacing: 3, marginBottom: 8 },
-  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#030309', borderRadius: 14, borderWidth: 1, borderColor: '#0d0d1e', paddingHorizontal: 16, height: 56 },
-  inputIconText: { color: '#6c63ff', fontSize: 14, fontWeight: 'bold', marginRight: 12, width: 28 },
+  splashGlow: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#6c63ff', opacity: 0.15 },
+  splashLogo: { width: 96, height: 96, borderRadius: 30, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 40, elevation: 30 },
+  splashLogoRing: { width: 80, height: 80, borderRadius: 24, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },
+  splashLogoLetter: { fontSize: 44, fontWeight: '900', color: '#fff', fontStyle: 'italic' },
+  splashTitle: { color: '#fff', fontSize: 36, fontWeight: '200', letterSpacing: 14, marginTop: 24 },
+  splashSub: { color: 'rgba(108,99,255,0.6)', fontSize: 12, letterSpacing: 4, marginTop: 10 },
+  meshBg: { position: 'absolute', width: 400, height: 400, borderRadius: 200, backgroundColor: 'rgba(108,99,255,0.07)', top: -150, left: -120 },
+  meshBg2: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(108,99,255,0.05)', top: height * 0.35, right: -100 },
+  meshBg3: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(180,100,255,0.04)', bottom: 60, left: -60 },
+  scroll: { flexGrow: 1, paddingBottom: 40 },
+  hero: { alignItems: 'center', paddingTop: Platform.OS === 'ios' ? height * 0.09 : height * 0.07, paddingBottom: 32 },
+  logoWrap: { alignItems: 'center', justifyContent: 'center', width: 160, height: 160, marginBottom: 20 },
+  logoGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: '#6c63ff', opacity: 0.12 },
+  logoHex: { width: 110, height: 110, borderRadius: 32, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 32, elevation: 25, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', position: 'relative' },
+  logoHexInner: { width: 88, height: 88, borderRadius: 26, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  logoLetter: { fontSize: 52, fontWeight: '900', color: '#fff', fontStyle: 'italic', letterSpacing: -2, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 2, height: 4 }, textShadowRadius: 8 },
+  orbitRing1: { position: 'absolute', width: 128, height: 128, borderRadius: 40, borderWidth: 1, borderColor: 'rgba(108,99,255,0.3)', borderStyle: 'dashed' },
+  orbitRing2: { position: 'absolute', width: 148, height: 148, borderRadius: 46, borderWidth: 0.5, borderColor: 'rgba(108,99,255,0.15)' },
+  cornerDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6, elevation: 6 },
+  cornerDotSm: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.7 },
+  cornerDotXs: { width: 5, height: 5, borderRadius: 2.5, opacity: 0.5 },
+  appTitle: { fontSize: 46, fontWeight: '200', color: '#fff', letterSpacing: 18, marginBottom: 14 },
+  taglineRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  taglineDash: { width: 24, height: 1, backgroundColor: 'rgba(108,99,255,0.5)' },
+  tagline: { color: 'rgba(108,99,255,0.65)', fontSize: 11, letterSpacing: 2 },
+  formWrap: { paddingHorizontal: 20 },
+  glassCard: { backgroundColor: 'rgba(8,8,20,0.95)', borderRadius: 28, padding: 28, borderWidth: 1, borderColor: '#0f0f22', overflow: 'hidden' },
+  cardTopAccent: { position: 'absolute', top: 0, left: 40, right: 40, height: 1, backgroundColor: '#6c63ff', opacity: 0.5 },
+  formHeading: { color: '#fff', fontSize: 24, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
+  formSubheading: { color: '#2a2a45', fontSize: 14, marginBottom: 28 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#04040e', borderRadius: 16, borderWidth: 1, borderColor: '#0f0f22', paddingHorizontal: 16, height: 58, marginBottom: 14 },
+  inputWrapFocused: { borderColor: '#6c63ff', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  inputPrefix: { color: '#6c63ff', fontSize: 16, marginRight: 12, width: 24 },
   input: { flex: 1, color: '#fff', fontSize: 15 },
   eyeBtn: { padding: 6 },
-  forgotRow: { alignItems: 'flex-end', marginBottom: 24, marginTop: 4 },
+  eyeText: { fontSize: 17 },
+  forgotRow: { alignItems: 'flex-end', marginBottom: 22, marginTop: 2 },
   forgotText: { color: '#6c63ff', fontSize: 13 },
-  signInBtn: { height: 56, borderRadius: 16, backgroundColor: '#6c63ff', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.6, shadowRadius: 20, elevation: 15 },
-  signInBtnGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.08)' },
-  signInBtnOff: { backgroundColor: '#1a1830', shadowOpacity: 0 },
-  signInBtnText: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 2 },
-  bioBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginTop: 12, backgroundColor: '#030309', borderWidth: 1, borderColor: '#6c63ff' },
-  bioBtnText: { color: '#6c63ff', fontWeight: '600', fontSize: 15 },
-  orRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  orLine: { flex: 1, height: 1, backgroundColor: '#0a0a18' },
-  orText: { color: '#111128', marginHorizontal: 14, fontSize: 10, letterSpacing: 3 },
-  createBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#6c63ff' },
-  createBtnText: { color: '#6c63ff', fontWeight: '700', fontSize: 16 },
+  signInBtn: { height: 58, borderRadius: 18, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', shadowColor: '#6c63ff', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 15 },
+  signInBtnBg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#6c63ff' },
+  signInBtnLoading: { opacity: 0.7, shadowOpacity: 0 },
+  signInBtnText: { color: '#fff', fontWeight: '700', fontSize: 16, letterSpacing: 1, zIndex: 1 },
+  bioBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 16, marginTop: 12, backgroundColor: '#04040e', borderWidth: 1, borderColor: '#6c63ff33' },
+  bioBtnText: { color: '#6c63ff', fontWeight: '600', fontSize: 14 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 22, gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#0a0a18' },
+  dividerLabel: { color: '#111128', fontSize: 9, letterSpacing: 3 },
+  createBtn: { height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#6c63ff33', backgroundColor: '#04040e' },
+  createBtnText: { color: '#6c63ff', fontWeight: '700', fontSize: 15 },
+  termsText: { color: '#0d0d20', fontSize: 11, textAlign: 'center', marginTop: 18, lineHeight: 16 },
+  termsLink: { color: '#1a1a35' },
 });
